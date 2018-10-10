@@ -1,9 +1,17 @@
 # IL_ROS_HSR
 
-Code for finishing up the bed-making project. It's based on Michael Laskey's old code.
+A package for performing various imitation learning and other tasks with the
+Toyota HSR. We'll use this for exploring different projects.
 
-If you want to see the old README I had before I removed images to save memory,
-[look at this from my homepage][1]. It contains some outdated stuff so please
-take this with a grain of salt.
+To install, run `python setup.py develop`. Use this in a virtualenv with Python
+2.7 (because of ROS compatibility issues).
 
-[1]:https://people.eecs.berkeley.edu/~seita/other/old_readme_for_IL_ROS_HSR_bed_make.pdf
+This code was used for, among other things, the [bed-making project][1], so some
+of the scripts and READMEs reflect that code usage. To get the exact code
+snapshot that was used for the paper, [clone this other GitHub repository
+instead][2] and set it up in your own virtualenv to avoid name clashes. That
+repository will not be updated further.
+
+
+[1]:https://arxiv.org/abs/1809.09810
+[2]:https://github.com/DanielTakeshi/IL_ROS_HSR
