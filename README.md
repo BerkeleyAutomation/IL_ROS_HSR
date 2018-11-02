@@ -25,6 +25,8 @@ Requirements: Ubuntu 16.04, ROS Kinetic, HSR package libraries.
   your changes in this code are immediately reflected (i.e., no re-installation
   is required).
 
+To get started connecting with the HSR, see `Getting_Started.md`.
+
 
 ## Code Structure
 

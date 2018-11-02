@@ -1,12 +1,12 @@
 # Getting Started
 
+Here is the exact process I go through to connect to the HSR, and to test moving
+its arm.
 
+First, ensure the robot is on. Then, hit the red e-stop, wait a few seconds, and
+release. The wrist should look firm when it's ready.
 
-Here, I go through the exact process of connecting to the HSR.
-
-First, ensure the robot is on. Then, hit the red e-stop, wait a few seconds, and release. The wrist should look firm when it's ready.
-
-Then, make a virtualenv that can connect to the HSR and test moving its arm. It worked for me.
+Make a virtualenv with the `--system-site-packages` option:
 
 ```
 seita@hermes1:~$ virtualenv --system-site-packages --python=python2 seita-venvs/py2-hsr-extensions
@@ -14,7 +14,13 @@ Running virtualenv with interpreter /usr/bin/python2
 New python executable in /home/seita/seita-venvs/py2-hsr-extensions/bin/python2
 Also creating executable in /home/seita/seita-venvs/py2-hsr-extensions/bin/python
 Installing setuptools, pkg_resources, pip, wheel...done.
+```
 
+
+Activate it, and you should be able to successfully import `hsrb_interface`:
+
+
+```
 seita@hermes1:~$ source seita-venvs/py2-hsr-extensions/bin/activate
 
 (py2-hsr-extensions) seita@hermes1:~$ ipython
@@ -31,8 +37,14 @@ object?   -> Details about 'object', use 'object??' for extra details.
 In [1]: import hsrb_interface
 
 In [2]: exit
+``
 
 
+If you try connecting to the HSR using the very convenient `ihsrb` command, you
+will get a connection refused:
+
+
+```
 (py2-hsr-extensions) seita@hermes1:~$ ihsrb
 ---------------------------------------------------------------------------
 RobotConnectionError                      Traceback (most recent call last)
@@ -58,7 +70,13 @@ RobotConnectionError                      Traceback (most recent call last)
     132         if not rospy.core.is_initialized():
 
 RobotConnectionError: [Errno 111] Connection refused
+```
 
+
+That's because you need to be in `hsrb_mode`:
+
+
+```
 (py2-hsr-extensions) seita@hermes1:~$ hsrb_mode 
 
 <hsrb>~$ ihsrb
@@ -88,4 +106,4 @@ In [7]: exit
 Leaving HSR-B Interactive Shell
 ```
 
-And it worked for me.
+And then this should work.
