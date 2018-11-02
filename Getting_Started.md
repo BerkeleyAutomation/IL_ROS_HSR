@@ -37,7 +37,7 @@ object?   -> Details about 'object', use 'object??' for extra details.
 In [1]: import hsrb_interface
 
 In [2]: exit
-``
+```
 
 
 If you try connecting to the HSR using the very convenient `ihsrb` command, you
