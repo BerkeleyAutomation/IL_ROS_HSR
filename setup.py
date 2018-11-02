@@ -10,5 +10,5 @@ setup(name='il_ros_hsr',
       author='Michael Laskey',
       author_email='laskeymd@berkeley.edu',
       package_dir = {'': 'src'},
-      packages=['il_ros_hsr', 'il_ros_hsr.tensor', 'il_ros_hsr.p_pi', 'il_ros_hsr.core'],
+      packages=['il_ros_hsr', 'il_ros_hsr.nets', 'il_ros_hsr.p_pi', 'il_ros_hsr.core'],
      )
