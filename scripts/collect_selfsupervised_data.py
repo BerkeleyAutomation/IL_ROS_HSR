@@ -3,50 +3,12 @@ Script for collecting images on the HSR for the bed-making project.
 (c) 2018 by Daniel Seita, Ryan Hoque
 """
 from hsr_core.sensors import RGBD
+from hsr_core.utils import process_depth
 import cv2, hsrb_interface, os, sys, time, pickle
 import numpy as np
 
 USERNAME = 'ryanhoque' # change as needed
 TARGET_DIR = '/nfs/diskstation/{}/ssldata'.format(USERNAME)
-
-def process_depth(d_img, thresh=1000):
-    """Example of how to process depth images to make them look prettier.
-    As an obvious reminder, if you are saving depth images, you should save the
-    raw depth images in addition to processed versions.
-    Parameters
-    ----------
-    d_img: (np.array)
-        Raw np.array of depth data values.
-    thresh: (int)
-        Distance threshold for when to 'black out' points, useful for
-        simplifying data.
-    """
-    def depth_to_3ch(img, cutoff):
-        """Useful to turn the background into black into the depth images.
-        """
-        w,h = img.shape
-        new_img = np.zeros([w,h,3])
-        img = img.flatten()
-        img[img>cutoff] = 0.0 
-        img = img.reshape([w,h])
-        for i in range(3):
-            new_img[:,:,i] = img 
-        return new_img
-    
-    
-    def depth_scaled_to_255(img):
-        """Scale into [0,256), equalize histograms.
-        """
-        assert np.max(img) > 0.0
-        img = 255.0/np.max(img)*img
-        img = np.array(img,dtype=np.uint8)
-        for i in range(3):
-            img[:,:,i] = cv2.equalizeHist(img[:,:,i])
-        return img 
-
-    d_img = depth_to_3ch(d_img, thresh)
-    d_img = depth_scaled_to_255(d_img)
-    return d_img
 
 def red_contour(image):
     """Finds the red contour in a color image. 
@@ -94,8 +56,7 @@ class DataCollector:
         self.omni_base = robot.get('omni_base')
         self.whole_body = robot.get('whole_body')
         self.cam = RGBD()
-        self.data = list() # list of processed depth images and actions taken (I_t, a_t)
-        self.idx = 0
+        self.data = dict() # list of processed depth images and actions taken (I_t, a_t)
         print("Initialized the data collector! Resting for 2 seconds...")
         time.sleep(2)
 
@@ -117,23 +78,22 @@ class DataCollector:
         return (c_img, c_img, c_img)
 
 
-    def collect_data(self):
+    def collect_data(self, episode, time_step):
         """Does one instance of data collection, then saves.
         """
         (c_img, d_img, d_img_proc) = self.get_images()
-        pth1 = os.path.join(TARGET_DIR, 'c_img_{}.png'.format(str(self.idx).zfill(3)))
-        pth2 = os.path.join(TARGET_DIR, 'd_img_{}.png'.format(str(self.idx).zfill(3)))
-        pth3 = os.path.join(TARGET_DIR, 'd_img_proc_{}.png'.format(str(self.idx).zfill(3)))
-        self.data.append({"image": d_img_proc, "action": None})
-        self.idx += 1
+        pth1 = os.path.join(TARGET_DIR, 'c_img_{}_{}.png'.format(str(episode).zfill(2), str(time_step).zfill(3)))
+        pth2 = os.path.join(TARGET_DIR, 'd_img_{}_{}.png'.format(str(episode).zfill(2), str(time_step).zfill(3)))
+        pth3 = os.path.join(TARGET_DIR, 'd_img_proc_{}_{}.png'.format(str(episode).zfill(2), str(time_step).zfill(3)))
+        self.data[(episode, time_step)] = {"image": d_img_proc, "action": None}
         cv2.imwrite(pth1, c_img)
         cv2.imwrite(pth2, d_img)
         cv2.imwrite(pth3, d_img_proc)
 
-    def record_action(self, action): 
+    def record_action(self, action, episode, time_step): 
         """Saves a_t, the action vector at time t = self.idx: [grasp_x, grasp_y, angle, length]
         """
-        self.data[self.idx - 1]["action"] = {'x': action[0], 'y': action[1], 'angle': action[2], 'length': action[3]}
+        self.data[(episode, time_step)]["action"] = {'x': action[0], 'y': action[1], 'angle': action[2], 'length': action[3]}
 
     def pickle(self):
         with open(os.path.join(TARGET_DIR, 'rollout.pkl'), 'wb') as handle:
@@ -158,7 +118,7 @@ class DataCollector:
                     org=(cX+30,cY+30), 
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale=1, 
-                    color=(255,255,255), 
+                    color=(0,0,0), 
                     thickness=2)
         cv2.imshow("Execute grasp {}/{} as shown, then press any key".format(str(grasp_num), str(total_grasp_num)), image)
         cv2.waitKey() # wait for a key press to continue execution
@@ -172,32 +132,44 @@ class DataCollector:
         cv2.waitKey()
         cv2.destroyAllWindows()
 
-NUM_EPISODES = 10
+NUM_EPISODES = 5
 NUM_ACTIONS_PER_EPISODE = 20
-VALID_ANGLES = [0, 90, 180, 270] # in degrees on the unit circle, where 0 degrees is the horizontal ("East") when facing the side of the bed
+POSSIBLE_ANGLES = [0, 90, 180, 270] # in degrees on the unit circle, where 0 degrees is the horizontal ("East") when facing the side of the bed
 VALID_LENGTHS = [20] # in cm
+BED_FRAME = {'RIGHT': 545, 'LEFT': 225, 'TOP': 230, 'BOTTOM': 275} # edges of the bed in pixel space (TOP can be the midpoint so we focus on one side). 
+# adjust BED_FRAME as needed after inspecting an image from the robot's point of view
 
 if __name__ == "__main__":
     if not os.path.exists(TARGET_DIR):
         os.makedirs(TARGET_DIR)
     dc = DataCollector()
     dc.orient_robot()
-    dc.collect_data() # record initial state
     for _episode in range(NUM_EPISODES):
         # (re)set the blanket to a random, not overly complex starting position (e.g. one gentle fold)
         dc.display_episode(dc.get_images()[0], _episode + 1)
+        dc.collect_data(_episode + 1, 0) # record time step 0 image for this episode
         for _action in range(NUM_ACTIONS_PER_EPISODE):
             # tell/show human what action to take. Future extension: incorporate active learning here
-            # sample angle and length
-            angle = VALID_ANGLES[np.random.randint(len(VALID_ANGLES))]
-            length = VALID_LENGTHS[np.random.randint(len(VALID_LENGTHS))]
-            # for now, it just tells us to grasp the corner, which should be marked with red.
+            # find grasp point for current image. for now, just return the red corner.
             current_rgb = dc.get_images()[0]
             (img, x, y) = red_contour(current_rgb)
+            # ensure the grasp is within the bounds of the bed frame
+            valid_angles = POSSIBLE_ANGLES[:]
+            if x > BED_FRAME['RIGHT']:
+                valid_angles.remove(0)
+            if y < BED_FRAME['TOP']:
+                valid_angles.remove(90)
+            if x < BED_FRAME['LEFT']:
+                valid_angles.remove(180)
+            if y > BED_FRAME['BOTTOM']:
+                valid_angles.remove(270)
+            # sample angle and length
+            angle = valid_angles[np.random.randint(len(valid_angles))]
+            length = VALID_LENGTHS[np.random.randint(len(VALID_LENGTHS))]
             # show the user where and how to pull
             dc.display_grasp(img, x, y, angle, length, _action + 1, NUM_ACTIONS_PER_EPISODE)
             action = [x, y, angle, length]
-            dc.record_action(action)
+            dc.record_action(action, _episode + 1, _action)
             # take image I_t+1
             dc.collect_data()
     dc.pickle()
