@@ -107,11 +107,11 @@ class DataCollector:
         if angle == 0: 
             dX = 50
         elif angle == 90: 
-            dY = 50
+            dY = -50
         elif angle == 180:
             dX = -50
         else:
-            dY = -50
+            dY = 50
         cv2.arrowedLine(image, (cX, cY), (cX + dX, cY + dY), (255, 0, 0), 3)
         cv2.putText(img=image, 
                     text="{} cm".format(length), 
@@ -144,11 +144,14 @@ if __name__ == "__main__":
         os.makedirs(TARGET_DIR)
     dc = DataCollector()
     dc.orient_robot()
+    print("Current bed frame limits: " + str(BED_FRAME) + ". Adjust as necessary.")
     for _episode in range(NUM_EPISODES):
         # (re)set the blanket to a random, not overly complex starting position (e.g. one gentle fold)
+        print("Episode " + str(_episode) + "starting!")
         dc.display_episode(dc.get_images()[0], _episode + 1)
-        dc.collect_data(_episode + 1, 0) # record time step 0 image for this episode
+        dc.collect_data(_episode + 1, 0) # record time step 0 image (initial state) for this episode
         for _action in range(NUM_ACTIONS_PER_EPISODE):
+            print("Grasp " + str(_action))
             # tell/show human what action to take. Future extension: incorporate active learning here
             # find grasp point for current image. for now, just return the red corner.
             current_rgb = dc.get_images()[0]
@@ -173,3 +176,4 @@ if __name__ == "__main__":
             # take image I_t+1
             dc.collect_data()
     dc.pickle()
+    print("Done")
