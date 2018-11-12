@@ -75,7 +75,7 @@ class DataCollector:
         c_img = self.cam.read_color_data()
         d_img = self.cam.read_depth_data()
         d_img_proc = process_depth(d_img)
-        return (c_img, c_img, c_img)
+        return (c_img, d_img, d_img_proc)
 
 
     def collect_data(self, episode, time_step):
