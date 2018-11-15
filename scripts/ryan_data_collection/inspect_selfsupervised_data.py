@@ -3,7 +3,7 @@ import pickle, cv2, os
 Visualize collected data in the form of color images + actions taken.
 """
 USERNAME = 'ryanhoque' # change as needed
-TARGET_DIR = '/nfs/diskstation/{}/ssldata'.format(USERNAME)
+DATAPATH = '/nfs/diskstation/{}/ssldata'.format(USERNAME)
 pkl = pickle.load(open(os.path.join(DATAPATH, "rollout.pkl"), 'rb'))
 
 def display_grasp(image, cX, cY, angle, length, grasp_num, total_grasp_num):
