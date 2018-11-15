@@ -52,7 +52,6 @@ class DataCollector:
         self.whole_body = robot.get('whole_body')
         self.cam = RGBD()
         self.data = dict() # list of processed depth images and actions taken (I_t, a_t)
-        self.color = dict()
         print("Initialized the data collector! Resting for 2 seconds...")
         time.sleep(2)
 
@@ -82,7 +81,6 @@ class DataCollector:
         pth2 = os.path.join(TARGET_DIR, 'd_img_{}_{}.png'.format(str(episode).zfill(2), str(time_step).zfill(3)))
         pth3 = os.path.join(TARGET_DIR, 'd_img_proc_{}_{}.png'.format(str(episode).zfill(2), str(time_step).zfill(3)))
         self.data[(episode, time_step)] = {"image": d_img_proc, "action": None}
-        self.color[(episode, time_step)] = {"image": c_img}
         cv2.imwrite(pth1, c_img)
         cv2.imwrite(pth2, d_img)
         cv2.imwrite(pth3, d_img_proc)
@@ -93,7 +91,7 @@ class DataCollector:
         self.data[(episode, time_step)]["action"] = {'x': action[0], 'y': action[1], 'angle': action[2], 'length': action[3]}
 
     def pickle(self):
-        with open(os.path.join(TARGET_DIR, 'rollout.pkl'), 'wb') as handle:
+        with open(os.path.join(TARGET_DIR, 'rollout2.pkl'), 'wb') as handle:
             pickle.dump(self.data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def display_episode(self, image, episode_num):
@@ -103,9 +101,22 @@ class DataCollector:
         cv2.waitKey()
         cv2.destroyAllWindows()
 
-    def compute_grasps():
-        for k in self.color:
-            x, y = red_contour(self.color[k])
+    def compute_grasps(self):
+        self.data = pickle.load(open('/nfs/diskstation/ryanhoque/ssldata/rollout.pkl', 'rb'))
+        for k in self.data:
+            image = cv2.imread('/nfs/diskstation/ryanhoque/ssldata/c_img_{}_{}.png'.format(str(k[0]).zfill(2), str(k[1]).zfill(3)))
+            cv2.imshow("", image)
+            cv2.waitKey()
+            cv2.destroyAllWindows()
+            try:
+                x, y = red_contour(image)
+            except: # cannot find red contour, so enter it manually
+                cv2.imshow("", image)
+                cv2.waitKey()
+                cv2.destroyAllWindows()
+                print("error: cannot find contour")
+                x = int(raw_input("enter x pixel\n"))
+                y = int(raw_input("enter y pixel\n"))
             if self.data[k]["action"]:
                 self.data[k]["action"]['x'] = x
                 self.data[k]["action"]['y'] = y
@@ -122,7 +133,8 @@ if __name__ == "__main__":
     grasp = ''
     for _episode in range(NUM_EPISODES):
         # (re)set the blanket to a random, not overly complex starting position (e.g. one gentle fold)
-        print("Episode " + str(_episode) + "starting!")
+        print("Episode " + str(_episode) + " starting!")
+        time.sleep(10)
         dc.display_episode(dc.get_images()[0], _episode + 1)
         dc.collect_data(_episode + 1, 0) # record time step 0 image (initial state) for this episode
         for _action in range(NUM_ACTIONS_PER_EPISODE):
@@ -144,7 +156,7 @@ if __name__ == "__main__":
         if grasp == 'q':
             break
     dc.pickle()
-    print("Done with pickling! Computing grasps...")
+    print("Saved! Computing grasps...")
     # fill in grasps afterwards
     dc.compute_grasps()
     dc.pickle()
