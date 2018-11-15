@@ -2,7 +2,8 @@ import pickle, cv2, os
 """
 Visualize collected data in the form of color images + actions taken.
 """
-DATAPATH = "/Users/ryanhoque/Desktop/SSLdata"
+USERNAME = 'ryanhoque' # change as needed
+TARGET_DIR = '/nfs/diskstation/{}/ssldata'.format(USERNAME)
 pkl = pickle.load(open(os.path.join(DATAPATH, "rollout.pkl"), 'rb'))
 
 def display_grasp(image, cX, cY, angle, length, grasp_num, total_grasp_num):
@@ -33,19 +34,16 @@ def display_grasp(image, cX, cY, angle, length, grasp_num, total_grasp_num):
     cv2.waitKey() # wait for a key press to continue execution
     cv2.destroyAllWindows()
 
-NUM_EPISODES = 4
+NUM_EPISODES = 10
 NUM_ACTIONS_PER_EPISODE = 20
 
-idx = 1
 for e in range(NUM_EPISODES):
-	for a in range(NUM_ACTIONS_PER_EPISODE):
-		print(idx)
-		c_img = cv2.imread(os.path.join(DATAPATH, "c_img_{}.png".format(str(idx).zfill(3))))
-		action = pkl[idx]['action']
+    for a in range(NUM_ACTIONS_PER_EPISODE + 1):
+		c_img = cv2.imread(os.path.join(DATAPATH, "d_img_proc_{}_{}.png".format(str(e + 1).zfill(2), str(a).zfill(3))))
+		action = pkl[(e + 1, a)]['action']
 		if action:
 			display_grasp(c_img, action['x'], action['y'], action['angle'], action['length'], a + 1, NUM_ACTIONS_PER_EPISODE)
 		else:
 			cv2.imshow("", c_img)
 			cv2.waitKey()
 			cv2.destroyAllWindows()
-		idx += 1

@@ -1,5 +1,6 @@
 """
-Collect data fast: the human chooses the direction, and a program finds the grasp points afterwards.
+Collect data fast: the human chooses the direction, and the script finds the grasp points afterwards.
+On the keyboard use WASD to specify which direction you chose.
 (c) 2018 by Daniel Seita, Ryan Hoque
 """
 from hsr_core.sensors import RGBD
@@ -145,9 +146,9 @@ if __name__ == "__main__":
             elif grasp == 'a':
                 action[2] = 180
             elif grasp == 's':
-                action[2] = 0
-            elif grasp == 'd':
                 action[2] = 270
+            elif grasp == 'd':
+                action[2] = 0
             elif grasp == 'q':
                 break
             dc.record_action(action, _episode + 1, _action)
