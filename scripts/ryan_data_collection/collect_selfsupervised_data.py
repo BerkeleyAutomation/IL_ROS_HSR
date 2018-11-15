@@ -174,6 +174,6 @@ if __name__ == "__main__":
             action = [x, y, angle, length]
             dc.record_action(action, _episode + 1, _action)
             # take image I_t+1
-            dc.collect_data()
+            dc.collect_data(_episode + 1, _action + 1)
     dc.pickle()
     print("Done")

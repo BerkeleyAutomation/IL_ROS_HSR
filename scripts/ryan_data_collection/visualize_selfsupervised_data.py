@@ -19,6 +19,9 @@ def display_grasp(image, cX, cY, angle, length, grasp_num, total_grasp_num):
     else:
         dY = 50
     cv2.arrowedLine(image, (cX, cY), (cX + dX, cY + dY), (255, 0, 0), 3)
+    cv2.circle(image, (cX,cY), 20, (255, 0, 0), 2)
+    cv2.line(image, (cX, cY - 30), (cX, cY + 30), (255, 0, 0), 2) # add crosshairs
+    cv2.line(image, (cX - 30, cY), (cX + 30, cY), (255, 0, 0), 2)
     cv2.putText(img=image, 
                 text="{} cm".format(length), 
                 org=(cX+30,cY+30), 
