@@ -15,6 +15,8 @@ TRANSFORMS_TMPDIR = 'tmp_transforms_test/'
 # For `train_action_predictor.py`
 VALID_TMPDIR = 'tmp_valid_preds/'
 
+# For plotting
+FIG_TMPDIR = 'tmp_figs/'
 
 # ------------------------------------------------------------------------------
 # Mean and std for PyTorch
@@ -35,6 +37,25 @@ GREEN = (0,255,0)
 RED   = (0,0,255)
 BLACK = (0,0,0)
 WHITE = (255,255,255)
+
+# ------------------------------------------------------------------------------
+# matplotlib
+# ------------------------------------------------------------------------------
+
+# Common stuff, label sizes, line width, etc.
+tsize = 35
+xsize = 28
+ysize = 28
+ticksize = 27
+legendsize = 27
+lw = 2
+
+# For bar charts
+bar_width = 0.35
+opacity = 0.4
+opacity1 = 0.5
+opacity2 = 0.8
+error_kw = dict(lw=4, capsize=5, capthick=3)
 
 # ------------------------------------------------------------------------------
 # Utility methods
