@@ -82,12 +82,27 @@ total 44M
 
 
 
-## Step 4: Validation
+## Step 4: Validation and Data Inspection
 
-TODO
+By default, the training script will save validation set information in
+`stats_valid.pkl` as you can see above. In addition, it will save images in a
+temporary validation set directory for qualitative inspections.
+
+Use `stats_train.pkl` and `stats_valid.pkl` for plotting. For an example, see
+`plot_example.py`.
+
 
 ## Step 5: Deployment on Physical Robot
 
+Before testing on the physical robot, please test in `deploy_test.py` on sample
+images.
+
+Pick the path to the model that you want to use. Then, write a script
+elsewhere that loads the model in a similar manner as `deploy_test.py` here. In
+order to use it in the real robot, the images should be roughly seen from
+similar angles, and the data must be processed similarly. Then, call the
+network, get the action, and "de-process" the action towards normal image-space.
+Then we convert that to robot space.
 
 TODO
 

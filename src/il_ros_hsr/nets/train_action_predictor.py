@@ -66,7 +66,8 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
         img_t   = _deprocess(img_t)
         img_tp1 = _deprocess(img_tp1)
 
-        # And similarly, for predictions. This is the (x,y) grasp point.
+        # Similarly, deprocess the (x,y) grasp point. To confirm, if we look at
+        # the BGR images, we better see 'targ_pos_int' at the red corner.
         targ_pos_int = int(targ_pos[0]*w), int(targ_pos[1]*h)
         pred_pos_int = int(pred_pos[0]*w), int(pred_pos[1]*h)
  
