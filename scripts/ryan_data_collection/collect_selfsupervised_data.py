@@ -75,7 +75,7 @@ class DataCollector:
         c_img = self.cam.read_color_data()
         d_img = self.cam.read_depth_data()
         d_img_proc = process_depth(d_img)
-        return (c_img, c_img, c_img)
+        return (c_img, d_img, d_img_proc)
 
 
     def collect_data(self, episode, time_step):
@@ -174,6 +174,6 @@ if __name__ == "__main__":
             action = [x, y, angle, length]
             dc.record_action(action, _episode + 1, _action)
             # take image I_t+1
-            dc.collect_data()
+            dc.collect_data(_episode + 1, _action + 1)
     dc.pickle()
     print("Done")
