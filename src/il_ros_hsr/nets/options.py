@@ -1,7 +1,6 @@
 import torchvision.models as models
 import os, datetime, json, sys
 
-
 # ------------------------------------------------------------------------------
 # Data paths
 # ------------------------------------------------------------------------------
@@ -14,7 +13,7 @@ NEW_DATA_SSL = 'ssldata_pytorch'
 TRANSFORMS_TMPDIR = 'tmp_transforms_test/'
 
 # For `train_action_predictor.py`
-
+VALID_TMPDIR = 'tmp_valid_preds/'
 
 
 # ------------------------------------------------------------------------------
@@ -27,7 +26,6 @@ STD  = [0.4306730, 0.4403830, 0.4480426]
 
 # ssldata2
 
-
 # ------------------------------------------------------------------------------
 # Colors for OpenCV, so we don't need to put in these numbers.
 # ------------------------------------------------------------------------------
@@ -37,7 +35,6 @@ GREEN = (0,255,0)
 RED   = (0,0,255)
 BLACK = (0,0,0)
 WHITE = (255,255,255)
-
 
 # ------------------------------------------------------------------------------
 # Utility methods
@@ -63,10 +60,10 @@ def get_model(args):
 def get_save_dir(args):
     """Make save path for whatever agent we are training. Save args as well.
     """
-    head = '/nfs/diskstation/seita/bedmake_ssl'
+    head    = '/nfs/diskstation/seita/bedmake_ssl'
+    date    = '{}'.format( datetime.datetime.now().strftime('%Y-%m-%d-%H-%M') )
     seedstr = str(args.seed).zfill(3)
-    date = '{}'.format( datetime.datetime.now().strftime('%Y-%m-%d-%H-%M') )
-    suffix = "{}_{}_{}".format(args.model, date, seedstr)
+    suffix  = "{}_{}_{}".format(args.model, date, seedstr)
     result_path = os.path.join(head, suffix)
     assert not os.path.exists(result_path), "Error: {} exists!".format(result_path)
 

@@ -41,6 +41,8 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
     can be done, but the training ones will require some knowledge of what we
     used for random cropping.
     """
+    if not os.path.exists(opt.VALID_TMPDIR):
+        os.makedirs(opt.VALID_TMPDIR)
     B = imgs_t.shape[0]
     imgs_t   = imgs_t.cpu().numpy()
     imgs_tp1 = imgs_tp1.cpu().numpy()
@@ -118,14 +120,11 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
                     color=opt.GREEN,
                     thickness=1)
 
-        # Combine images (t,tp1) together.
+        # Combine images (t,tp1) together and save.
         hstack = np.concatenate((img, img_tp1), axis=1)
-
-        # Inspect!
-        fname = '{}/{}_{}_{:.0f}.png'.format(TMPDIR2, phase, str(b).zfill(4), L2_pix)
+        fname = '{}/{}_{}_{:.0f}.png'.format(opt.VALID_TMPDIR, phase, str(b).zfill(4), L2_pix)
         cv2.imwrite(fname, hstack)
-
-    print("Just finished saving validation images! Look at: {}".format(TMPDIR2))
+    print("Just finished saving validation images! Look at: {}".format(opt.VALID_TMPDIR))
 
 
 def _log(phase, ep_loss, ep_loss_pos, ep_loss_ang, ep_correct_ang):
@@ -325,8 +324,18 @@ if __name__ == "__main__":
 
     args = pp.parse_args() 
     # --------------------------------------------------------------------------
+    torch.manual_seed(args.seed)
 
     save_dir = opt.get_save_dir(args)
     print("Saving in: {}".format(save_dir))
     resnet = opt.get_model(args)
     model, stats_train, stats_valid = train(resnet, args)
+
+    # https://pytorch.org/tutorials/beginner/saving_loading_models.html
+    torch.save(model.state_dict(), join(save_dir,'model.pt'))
+
+    with open(join(save_dir,'stats_train.pkl'), 'w') as fh:
+        pickle.dump(stats_train, fh)
+    with open(join(save_dir,'stats_valid.pkl'), 'w') as fh:
+        pickle.dump(stats_valid, fh)
+    print("Done!")

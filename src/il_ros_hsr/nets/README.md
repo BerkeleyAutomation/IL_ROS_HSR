@@ -6,7 +6,9 @@ Use this for generic training of anything relevant to this project. See
 
 Also: it is simplest for now if you run all python scripts within this
 directory, so `python [script_name.py]`, not `python
-il_ros_hsr/nets/[script_name].py`, etc.
+il_ros_hsr/nets/[script_name].py`, etc. The script will sometimes make temporary
+directories, prefixed with `tmp`, for visualization purposes. These can be
+removed.
 
 
 ## Step 1: Data Generation
@@ -55,11 +57,29 @@ Run `python train_action_predictor.py`. But before doing so:
   
 - There are command line arguments. Test and see which ones work.
 
-The actual Deep Convolutional Neural Network that we use is defined in `net.py`.
-It follows a Siamese design and uses pre-trained ResNet backbones.  It may also
-help to run tests on the custom transformations we have, by running `python
-custom_transforms.py`. This shows how we do data augmentation for training. The
-validation data augmentation, of course, must be deterministic.
+- The actual Deep Convolutional Neural Network that we use is defined in
+  `net.py`.  It follows a Siamese design and uses pre-trained ResNet backbones.
+
+- The models and statistics are saved in a particular directory. To make it easy
+  to remember what we ran, the args are stored there. Additionally, the date is
+  included in the name, e.g.,: `resnet18_2018-11-16-14-20_000` means we started
+  running the script on Nov (i.e., represented by the number 11) 16 at 14:20
+  (2:20pm).
+
+
+Additionally, inside the model directory, we save the args, PyTorch model
+(`model.pt`), and the statistics encountered during training. Here is a possible
+output:
+
+```
+$ ls -lh resnet18_2018-11-16-14-27_000/
+total 44M
+-rw-rw-r-- 1 nobody nogroup 101 Nov 16 14:27 args.json
+-rw-rw-r-- 1 nobody nogroup 44M Nov 16 14:28 model.pt
+-rw-rw-r-- 1 nobody nogroup 712 Nov 16 14:28 stats_train.pkl
+-rw-rw-r-- 1 nobody nogroup 710 Nov 16 14:28 stats_valid.pkl
+```
+
 
 
 ## Step 4: Validation
