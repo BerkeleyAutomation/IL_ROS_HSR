@@ -6,3 +6,6 @@
 *.swo
 trash
 fast_path
+
+src/il_ros_hsr/nets/ssldata*
+

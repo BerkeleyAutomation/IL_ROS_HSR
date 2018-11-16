@@ -1,3 +1,6 @@
+import torchvision.models as models
+import os, datetime, json, sys
+
 
 # ------------------------------------------------------------------------------
 # Data paths
@@ -37,7 +40,38 @@ WHITE = (255,255,255)
 
 
 # ------------------------------------------------------------------------------
-# Arrows and directions
+# Utility methods
 # ------------------------------------------------------------------------------
 
+RESNET_18 = models.resnet18(pretrained=True)
+RESNET_34 = models.resnet34(pretrained=True)
+RESNET_50 = models.resnet50(pretrained=True)
 
+def get_model(args):
+    """Pre-trained model.
+    """
+    if args.model == 'resnet18':
+        return RESNET_18
+    elif args.model == 'resnet34':
+        return RESNET_34
+    elif args.model == 'resnet50':
+        return RESNET_50
+    else:
+        raise ValueError(args.model)
+
+
+def get_save_dir(args):
+    """Make save path for whatever agent we are training. Save args as well.
+    """
+    head = '/nfs/diskstation/seita/bedmake_ssl'
+    seedstr = str(args.seed).zfill(3)
+    date = '{}'.format( datetime.datetime.now().strftime('%Y-%m-%d-%H-%M') )
+    suffix = "{}_{}_{}".format(args.model, date, seedstr)
+    result_path = os.path.join(head, suffix)
+    assert not os.path.exists(result_path), "Error: {} exists!".format(result_path)
+
+    os.makedirs(result_path)
+    with open(os.path.join(result_path,'args.json'), 'w') as fh:
+        json.dump(vars(args), fh)
+
+    return result_path
