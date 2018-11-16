@@ -1,5 +1,7 @@
 # Scripts
 
+## Bed-Making Project (arXiv 2018)
+
 - Use `collect_data_bed_fast.py` for collecting data.
 
 - Use `deploy.py` for deploying anything. We have arguments which can specify
@@ -21,8 +23,3 @@ Notes:
   ```
 
   that way we avoid an obvious source of bias.
-
-  When we do the analytic one, we should also count how many attempts had the
-  grasp point (i.e., highest point) on the opposite side of the bed, since we do
-  _not_ use a similar cutoff for the neural networks, so we are strengthening
-  the baseline.
