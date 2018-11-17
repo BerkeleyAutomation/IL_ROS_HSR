@@ -3,8 +3,8 @@ import torch.nn as nn
 import os, sys
 
 
-class PolicyNet(nn.Module):
-    """The policy network, or what determines actions.
+class ActPredictorNet(nn.Module):
+    """Predicts actions.
 
     We borrow a `model` as input, which is the pre-trained ResNet stem.  Then we
     can adjust the last layer so it doesn't go to just 2 units but more (e.g.,
@@ -14,17 +14,20 @@ class PolicyNet(nn.Module):
     and to also _return_ multiple outputs.
     """
 
-    def __init__(self, model, args):
-        super(PolicyNet, self).__init__()
+    def __init__(self, pretrained, args):
+        """
+        The pretrained model must have a `fc` at the end, which we override.
+        Use the ResNets as pretrained stems.
+        """
+        super(ActPredictorNet, self).__init__()
         self.args = args
 
-        # Handle pre-trained stem, then FC after
-        num_latent = model.fc.in_features
-        model.fc = nn.Linear(num_latent, 200)
-        self.pretrain_stem = model
+        num_latent = pretrained.fc.in_features
+        pretrained.fc = nn.Linear(num_latent, 200)
+        self.pretrain_stem = pretrained
+
         self.fc1 = nn.Linear(400, 200)
         self.fc2 = nn.Linear(200, 200)
-
         self.fc_pixel = nn.Linear(200, 2)
         self.fc_angle = nn.Linear(200, 4)
 

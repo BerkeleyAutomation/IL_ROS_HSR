@@ -65,14 +65,14 @@ RESNET_18 = models.resnet18(pretrained=True)
 RESNET_34 = models.resnet34(pretrained=True)
 RESNET_50 = models.resnet50(pretrained=True)
 
-def get_model(args):
+def get_pretrained_model(args):
     """Pre-trained model.
     """
-    if args.model == 'resnet18':
+    if args.pretrained_model == 'resnet18':
         return RESNET_18
-    elif args.model == 'resnet34':
+    elif args.pretrained_model == 'resnet34':
         return RESNET_34
-    elif args.model == 'resnet50':
+    elif args.pretrained_model == 'resnet50':
         return RESNET_50
     else:
         raise ValueError(args.model)
@@ -84,7 +84,7 @@ def get_save_dir(args):
     head    = '/nfs/diskstation/seita/bedmake_ssl'
     date    = '{}'.format( datetime.datetime.now().strftime('%Y-%m-%d-%H-%M') )
     seedstr = str(args.seed).zfill(3)
-    suffix  = "{}_{}_{}".format(args.model, date, seedstr)
+    suffix  = "{}_{}_{}".format(args.pretrained_model, date, seedstr)
     result_path = os.path.join(head, suffix)
     assert not os.path.exists(result_path), "Error: {} exists!".format(result_path)
 
@@ -93,3 +93,10 @@ def get_save_dir(args):
         json.dump(vars(args), fh)
 
     return result_path
+
+
+def debug_state_dict(model):
+    print("\nHere are the keys in this model's `state_dict()`:\n")
+    for key in model.state_dict():
+        print(key)
+    print("\n")
