@@ -67,19 +67,18 @@ Run `python train_action_predictor.py`. But before doing so:
   (2:20pm).
 
 
-Additionally, inside the model directory, we save the args, PyTorch model
-(`model.pt`), and the statistics encountered during training. Here is a possible
-output:
+Additionally, inside the model directory, we save the args, PyTorch model (with
+the usual `.pt` extension), and the statistics encountered during training.
+Here is a possible output:
 
 ```
-$ ls -lh resnet18_2018-11-16-14-27_000/
+$ ls -lh resnet18_2018-11-16-16-53_000
 total 44M
--rw-rw-r-- 1 nobody nogroup 101 Nov 16 14:27 args.json
--rw-rw-r-- 1 nobody nogroup 44M Nov 16 14:28 model.pt
--rw-rw-r-- 1 nobody nogroup 712 Nov 16 14:28 stats_train.pkl
--rw-rw-r-- 1 nobody nogroup 710 Nov 16 14:28 stats_valid.pkl
+-rw-rw-r-- 1 nobody nogroup  44M Nov 16 16:54 act_predictor.pt
+-rw-rw-r-- 1 nobody nogroup  112 Nov 16 16:53 args.json
+-rw-rw-r-- 1 nobody nogroup 1007 Nov 16 16:54 stats_train.pkl
+-rw-rw-r-- 1 nobody nogroup 1007 Nov 16 16:54 stats_valid.pkl
 ```
-
 
 
 ## Step 4: Validation and Data Inspection

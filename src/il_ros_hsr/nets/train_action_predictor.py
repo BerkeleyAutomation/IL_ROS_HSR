@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
 from torchvision.transforms import functional as F
 
-from il_ros_hsr.nets.net import PolicyNet
+from il_ros_hsr.nets.net import ActPredictorNet
 from il_ros_hsr.nets import options as opt
 from il_ros_hsr.nets import custom_transforms as CT
 
@@ -137,7 +137,7 @@ def _log(phase, ep_loss, ep_loss_pos, ep_loss_ang, ep_correct_ang):
     print("correct_ang: {:.4f}".format(ep_correct_ang))
 
 
-def train(model, args):
+def train(pretrained_model, args):
     # To debug transformation(s), look at `custom_transforms.py`.
     transforms_train = transforms.Compose([
         CT.Rescale((256,256)),
@@ -169,14 +169,14 @@ def train(model, args):
     print("data_sizes: {}\n".format(data_sizes))
 
     # Build policy w/pre-trained stem. Can print it to debug.
-    policy = PolicyNet(model, args)
-    policy = policy.to(device)
+    act_predictor = ActPredictorNet(pretrained_model, args)
+    act_predictor = act_predictor.to(device)
 
     # Optimizer and loss functions.
     if args.optim == 'sgd':
-        optimizer = optim.SGD(policy.parameters(), lr=args.lrate, momentum=0.9)
+        optimizer = optim.SGD(act_predictor.parameters(), lr=args.lrate, momentum=0.9)
     elif args.optim == 'adam':
-        optimizer = optim.Adam(policy.parameters(), lr=args.lrate)
+        optimizer = optim.Adam(act_predictor.parameters(), lr=args.lrate)
     else:
         raise ValueError(args.optim)
     criterion_mse  = nn.MSELoss()
@@ -187,7 +187,7 @@ def train(model, args):
     # Use `all_train` and `all_valid` to record statistics for analysis later.
     # --------------------------------------------------------------------------
     since = time.time()
-    best_model_wts = copy.deepcopy(model.state_dict())
+    best_model_wts = copy.deepcopy(act_predictor.state_dict())
     best_loss = np.float('inf')
     all_train = defaultdict(list)
     all_valid = defaultdict(list)
@@ -201,9 +201,9 @@ def train(model, args):
         # Each epoch has a training and validation phase.
         for phase in ['train', 'valid']:
             if phase == 'train':
-                model.train()
+                act_predictor.train()
             else:
-                model.eval()
+                act_predictor.eval()
             # Track statistics over _this_ coming epoch only.
             running = defaultdict(list)
 
@@ -220,7 +220,7 @@ def train(model, args):
 
                 # Forward: track gradient history _only_ if training
                 with torch.set_grad_enabled(phase == 'train'):
-                    out_pos, out_ang = policy(imgs_t, imgs_tp1)
+                    out_pos, out_ang = act_predictor(imgs_t, imgs_tp1)
 
                     # Get classification accuracy from the predicted angle probs
                     _, ang_predict = torch.max(out_ang, dim=1)
@@ -270,7 +270,7 @@ def train(model, args):
             # deep copy the model, use `state_dict()`.
             if phase == 'valid' and ep_loss < best_loss:
                 best_loss = ep_loss
-                best_model_wts = copy.deepcopy(model.state_dict())
+                best_model_wts = copy.deepcopy(act_predictor.state_dict())
         print('-' * 30)
 
     time_elapsed = time.time() - since
@@ -280,8 +280,8 @@ def train(model, args):
     print('  valid:\n{}'.format(all_valid['loss']))
 
     # Load best model weights, make predictions on validation to confirm
-    model.load_state_dict(best_model_wts)
-    model.eval()
+    act_predictor.load_state_dict(best_model_wts)
+    act_predictor.eval()
     print("\nVisualizing performance of best model on validation set:")
 
     for minibatch in dataloaders['valid']:
@@ -293,7 +293,7 @@ def train(model, args):
 
         optimizer.zero_grad()
         with torch.set_grad_enabled(False):
-            out_pos, out_ang = policy(imgs_t, imgs_tp1)
+            out_pos, out_ang = act_predictor(imgs_t, imgs_tp1)
             _, ang_predict = torch.max(out_ang, dim=1)
             correct_ang = (ang_predict == labels_ang).sum().item()
 
@@ -305,13 +305,13 @@ def train(model, args):
             _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
                          out_ang, ang_predict, loss, phase='valid')
 
-    return model, all_train, all_valid
+    return act_predictor, all_train, all_valid
 
 
 if __name__ == "__main__":
     # --------------------------------------------------------------------------
     pp = argparse.ArgumentParser()
-    pp.add_argument('--model', type=str, default='resnet18')
+    pp.add_argument('--pretrained_model', type=str, default='resnet18')
     pp.add_argument('--num_epochs', type=int, default=30)
     pp.add_argument('--seed', type=int, default=0)
 
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     pp.add_argument('--optim', type=str, default='adam')
     pp.add_argument('--lrate', type=str, default=0.0001)
 
-    # Rely on several options for the loss type. See `PolicyNet` for details.
+    # Rely on several options for the loss type. See network class for details.
     pp.add_argument('--model_type', type=int, default=1)
 
     args = pp.parse_args() 
@@ -329,14 +329,14 @@ if __name__ == "__main__":
 
     save_dir = opt.get_save_dir(args)
     print("Saving in: {}".format(save_dir))
-    resnet = opt.get_model(args)
-    model, stats_train, stats_valid = train(resnet, args)
+    resnet = opt.get_pretrained_model(args)
+    act_predictor, stats_train, stats_valid = train(resnet, args)
 
     # https://pytorch.org/tutorials/beginner/saving_loading_models.html
-    torch.save(model.state_dict(), join(save_dir,'model.pt'))
+    torch.save(act_predictor.state_dict(), join(save_dir,'act_predictor.pt'))
 
     with open(join(save_dir,'stats_train.pkl'), 'w') as fh:
         pickle.dump(stats_train, fh)
     with open(join(save_dir,'stats_valid.pkl'), 'w') as fh:
         pickle.dump(stats_valid, fh)
-    print("Done!")
+    print("Done! Recall that we saved at: {}".format(save_dir))
