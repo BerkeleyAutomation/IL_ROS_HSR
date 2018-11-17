@@ -72,18 +72,18 @@ error_kw = dict(lw=4, capsize=5, capthick=3)
 # Utility methods
 # ------------------------------------------------------------------------------
 
-RESNET_18 = models.resnet18(pretrained=True)
-RESNET_34 = models.resnet34(pretrained=True)
-RESNET_50 = models.resnet50(pretrained=True)
 
 def get_pretrained_model(args):
     """Pre-trained model.
     """
     if args.pretrained_model == 'resnet18':
+        RESNET_18 = models.resnet18(pretrained=True)
         return RESNET_18
     elif args.pretrained_model == 'resnet34':
+        RESNET_34 = models.resnet34(pretrained=True)
         return RESNET_34
     elif args.pretrained_model == 'resnet50':
+        RESNET_50 = models.resnet50(pretrained=True)
         return RESNET_50
     else:
         raise ValueError(args.model)

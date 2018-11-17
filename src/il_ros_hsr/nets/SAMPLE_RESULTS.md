@@ -1,7 +1,7 @@
 # Tentative Results
 
-
-Here is a sample output, from running:
+On commit 3526e1815e061362a55b0fd8d700747e9d4908e0 with ssldata2, here is a
+sample output, from running:
 
 ```
 (py2-torch) seita@hermes1:~/IL_ROS_HSR/src/il_ros_hsr/nets$ python train_action_predictor.py  --num_epochs 30

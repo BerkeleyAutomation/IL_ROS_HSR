@@ -72,16 +72,19 @@ Run `python train_action_predictor.py`. Note that:
   the *qualitative* results.
  
 Additionally, inside the model directory, we save the args, PyTorch model (with
-the usual `.pt` extension), and the statistics encountered during training.
-Here is a possible output:
+the usual `.pt` extension), and the statistics encountered during training. We
+also save the command line args (`args`) and the options file (`options.txt`).
+This helps us know what settings we ran for training.  Here is a possible
+output:
 
 ```
-$ ls -lh resnet18_2018-11-16-16-53_000
+$ ls -lh /nfs/diskstation/seita/bedmake_ssl/resnet18_2018-11-17-12-57_000
 total 44M
--rw-rw-r-- 1 nobody nogroup  44M Nov 16 16:54 act_predictor.pt
--rw-rw-r-- 1 nobody nogroup  112 Nov 16 16:53 args.json
--rw-rw-r-- 1 nobody nogroup 1007 Nov 16 16:54 stats_train.pkl
--rw-rw-r-- 1 nobody nogroup 1007 Nov 16 16:54 stats_valid.pkl
+-rw-rw-r-- 1 nobody nogroup  44M Nov 17 12:58 act_predictor.pt
+-rw-rw-r-- 1 nobody nogroup  112 Nov 17 12:57 args.json
+-rw-rw-r-- 1 nobody nogroup  267 Nov 17 12:57 options.txt
+-rw-rw-r-- 1 nobody nogroup 1002 Nov 17 12:58 stats_train.pkl
+-rw-rw-r-- 1 nobody nogroup 1004 Nov 17 12:58 stats_valid.pkl
 ```
 
 

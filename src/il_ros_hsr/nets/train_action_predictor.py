@@ -27,6 +27,21 @@ def _deprocess(img):
     return img
    
 
+def _save_cfg(config_path):
+    """Saves `options.txt` which provides info from the `options.py` file.
+    Helps us in case we need to figure out what settings we ran for this.
+    To be clear, this is not the `args` but what was in `options.py`.
+    """
+    avoid = ['BLUE', 'GREEN', 'RED', 'BLACK', 'WHITE']
+    with open(config_path, 'w') as f:
+        # i.e., the variables in `il_ros_hsr.nets.options`
+        cfg_dict = opt.__dict__
+        for key in sorted(cfg_dict.keys()):
+            if key[0].isupper() and key not in avoid:
+                cfg_str = '{}: {}\n'.format(key, cfg_dict[key])
+                f.write(cfg_str)
+
+
 def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
                  out_ang, ang_predict, loss, phase='valid'):
     """Debugging the data transforms, labels, net predictions, etc.
@@ -115,7 +130,7 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
 
         cv2.putText(img=img, 
                     text="pred pos: {}".format(pred_pos_int),
-                    org=(10,10),
+                    org=(10,15),
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
                     fontScale=0.5, 
                     color=opt.GREEN,
@@ -322,19 +337,21 @@ if __name__ == "__main__":
 
     # Rely on several options for the loss type. See network class for details.
     pp.add_argument('--model_type', type=int, default=1)
-
     args = pp.parse_args() 
     # --------------------------------------------------------------------------
-    torch.manual_seed(args.seed)
 
+    # Bells and whistles, saving stuff, etc.
+    torch.manual_seed(args.seed)
     save_dir = opt.get_save_dir(args)
     print("Saving in: {}".format(save_dir))
+    _save_cfg(join(save_dir, 'options.txt'))
+
+    # Get pre-trained model and train!
     resnet = opt.get_pretrained_model(args)
     act_predictor, stats_train, stats_valid = train(resnet, args)
 
     # https://pytorch.org/tutorials/beginner/saving_loading_models.html
     torch.save(act_predictor.state_dict(), join(save_dir,'act_predictor.pt'))
-
     with open(join(save_dir,'stats_train.pkl'), 'w') as fh:
         pickle.dump(stats_train, fh)
     with open(join(save_dir,'stats_valid.pkl'), 'w') as fh:
