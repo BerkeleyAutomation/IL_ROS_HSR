@@ -6,6 +6,8 @@ involving the HSR and the Fetch robots.
 Right now, it supports the HSR and bed-making (as suggested by the package
 name), but we will eventually add more tasks and seamless support for the Fetch.
 
+We also have [code for training and deploying networks][4], using PyTorch 0.4.1.
+
 
 ## Installation
 
@@ -63,3 +65,4 @@ updated further.
 [1]:https://arxiv.org/abs/1809.09810
 [2]:https://github.com/DanielTakeshi/IL_ROS_HSR
 [3]:https://github.com/BerkeleyAutomation/HSR_CORE
+[4]:https://github.com/BerkeleyAutomation/IL_ROS_HSR/tree/master/src/il_ros_hsr/nets
