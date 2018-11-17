@@ -94,10 +94,10 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
         # Overlay prediction vs target.
         # Using `img` gets a weird OpenCV error, I had to add 'contiguous' here.
         img = np.ascontiguousarray(img_t, dtype=np.uint8)
-        cv2.circle(img, center=targ_pos_int, radius=2, color=(0,0,255), thickness=-1)
-        cv2.circle(img, center=targ_pos_int, radius=3, color=(0,0,0),   thickness=1)
-        cv2.circle(img, center=pred_pos_int, radius=2, color=(255,0,0), thickness=-1)
-        cv2.circle(img, center=pred_pos_int, radius=3, color=(0,255,0), thickness=1)
+        cv2.circle(img, center=targ_pos_int, radius=2, color=opt.RED,   thickness=-1)
+        cv2.circle(img, center=targ_pos_int, radius=3, color=opt.BLACK, thickness=1)
+        cv2.circle(img, center=pred_pos_int, radius=2, color=opt.BLUE,  thickness=-1)
+        cv2.circle(img, center=pred_pos_int, radius=3, color=opt.GREEN, thickness=1)
 
         # This is the direction. Don't worry about the length, we can't easily get
         # it in pixel space and we keep length in world-space roughly fixed anyway.

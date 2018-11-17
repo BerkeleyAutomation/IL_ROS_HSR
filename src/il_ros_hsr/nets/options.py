@@ -1,5 +1,9 @@
+"""
+Use capital letters for variables, e.g. for data paths, image types, etc. Those
+are put into `options.txt` when training, helping us to reproduce results.
+"""
 import torchvision.models as models
-import os, datetime, json, sys
+import argparse, os, datetime, json, sys
 
 # ------------------------------------------------------------------------------
 # Options for training
@@ -23,6 +27,9 @@ TRANSFORMS_TMPDIR = 'tmp_transforms_test/'
 
 # For `train_action_predictor.py`
 VALID_TMPDIR = 'tmp_valid_preds/'
+
+# For `deploy_test.py`
+DEPLOY_TMPDIR = 'tmp_deploy/'
 
 # For plotting
 FIG_TMPDIR = 'tmp_figs/'
@@ -111,3 +118,10 @@ def debug_state_dict(model):
     for key in model.state_dict():
         print(key)
     print("\n")
+
+
+def _json_to_args(jsonfile):
+    args = argparse.Namespace()
+    args.pretrained_model = jsonfile['pretrained_model']
+    args.model_type       = jsonfile['model_type']
+    return args

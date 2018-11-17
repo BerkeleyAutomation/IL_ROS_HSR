@@ -100,19 +100,25 @@ Use `stats_train.pkl` and `stats_valid.pkl` for plotting. For an example, see
 
 ## Step 5: Deployment on Physical Robot
 
-Before testing on the physical robot, please test in `deploy_test.py` on sample
-images. Make sure you check that the network you want to load is the correct
-one.
-
-Once the test deployment is working, use `deploy_physical.py` on the physical
-robot. The robot must be on, connected via the same WiFi, and you must be in
-"hsrb mode" obviously.
-
 **Critical**: the images from the robot should be roughly seen from similar
 angles and positions as in the training data, and the data should be processed
 in the same way as the *validation set* images. Then, call the network, get the
 action, and "de-process" the action towards normal image-space. Then we convert
 that to robot space.
+
+- Before testing on the physical robot, please test in `deploy_test.py` on
+  sample images.  It uses custom methods that let us go through the same
+  transforms as we did during training/validation, but lets us directly use it
+  from numpy images, which is easier to use in deployment. (Otherwise we'd have
+  to write the same train/valid pickle files that we did for training.)
+
+Once the test deployment is working, use `deploy_physical.py` on the physical
+robot.
+
+- The robot must be on, connected via the same WiFi, and you must be in "hsrb
+  mode" obviously.
+
+- **TODO: the physical deployment script is not finished yet**
 
 
 [1]:https://github.com/BerkeleyAutomation/IL_ROS_HSR/tree/master/scripts/ryan_data_collection
