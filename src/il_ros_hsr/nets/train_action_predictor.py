@@ -125,7 +125,6 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
         hstack = np.concatenate((img, img_tp1), axis=1)
         fname = '{}/{}_{}_{:.0f}.png'.format(opt.VALID_TMPDIR, phase, str(b).zfill(4), L2_pix)
         cv2.imwrite(fname, hstack)
-    print("Just finished saving validation images! Look at: {}".format(opt.VALID_TMPDIR))
 
 
 def _log(phase, ep_loss, ep_loss_pos, ep_loss_ang, ep_correct_ang):
@@ -284,7 +283,7 @@ def train(pretrained_model, args):
     act_predictor.eval()
     print("\nVisualizing performance of best model on validation set:")
 
-    for minibatch in dataloaders['valid']:
+    for mb in dataloaders['valid']:
         imgs_t     = (mb['img_t']).to(device)
         imgs_tp1   = (mb['img_tp1']).to(device)
         labels     = (mb['label']).to(device)
@@ -300,11 +299,12 @@ def train(pretrained_model, args):
             loss_pos = criterion_mse(out_pos, labels_pos)
             loss_ang = criterion_cent(out_ang, labels_ang)
             loss = loss_pos + loss_ang
-            print("  {} / {} angle accuracy".format(correct_ang, imgs_t.size(0)))
-
+            print("  {} / {} angle accuracy for this mb".format(correct_ang,
+                    imgs_t.size(0)))
             _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
-                         out_ang, ang_predict, loss, phase='valid')
+                    out_ang, ang_predict, loss, phase='valid')
 
+    print("Just finished saving validation images! Look at: {}".format(opt.VALID_TMPDIR))
     return act_predictor, all_train, all_valid
 
 
@@ -339,4 +339,4 @@ if __name__ == "__main__":
         pickle.dump(stats_train, fh)
     with open(join(save_dir,'stats_valid.pkl'), 'w') as fh:
         pickle.dump(stats_valid, fh)
-    print("Done! Recall that we saved at: {}".format(save_dir))
+    print("\nDone! Look at this directory for results:\n{}".format(save_dir))
