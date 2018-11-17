@@ -27,6 +27,21 @@ def _deprocess(img):
     return img
    
 
+def _save_cfg(config_path):
+    """Saves `options.txt` which provides info from the `options.py` file.
+    Helps us in case we need to figure out what settings we ran for this.
+    To be clear, this is not the `args` but what was in `options.py`.
+    """
+    avoid = ['BLUE', 'GREEN', 'RED', 'BLACK', 'WHITE']
+    with open(config_path, 'w') as f:
+        # i.e., the variables in `il_ros_hsr.nets.options`
+        cfg_dict = opt.__dict__
+        for key in sorted(cfg_dict.keys()):
+            if key[0].isupper() and key not in avoid:
+                cfg_str = '{}: {}\n'.format(key, cfg_dict[key])
+                f.write(cfg_str)
+
+
 def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
                  out_ang, ang_predict, loss, phase='valid'):
     """Debugging the data transforms, labels, net predictions, etc.
@@ -115,7 +130,7 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
 
         cv2.putText(img=img, 
                     text="pred pos: {}".format(pred_pos_int),
-                    org=(10,10),
+                    org=(10,15),
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
                     fontScale=0.5, 
                     color=opt.GREEN,
@@ -125,7 +140,6 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
         hstack = np.concatenate((img, img_tp1), axis=1)
         fname = '{}/{}_{}_{:.0f}.png'.format(opt.VALID_TMPDIR, phase, str(b).zfill(4), L2_pix)
         cv2.imwrite(fname, hstack)
-    print("Just finished saving validation images! Look at: {}".format(opt.VALID_TMPDIR))
 
 
 def _log(phase, ep_loss, ep_loss_pos, ep_loss_ang, ep_correct_ang):
@@ -284,7 +298,7 @@ def train(pretrained_model, args):
     act_predictor.eval()
     print("\nVisualizing performance of best model on validation set:")
 
-    for minibatch in dataloaders['valid']:
+    for mb in dataloaders['valid']:
         imgs_t     = (mb['img_t']).to(device)
         imgs_tp1   = (mb['img_tp1']).to(device)
         labels     = (mb['label']).to(device)
@@ -300,11 +314,12 @@ def train(pretrained_model, args):
             loss_pos = criterion_mse(out_pos, labels_pos)
             loss_ang = criterion_cent(out_ang, labels_ang)
             loss = loss_pos + loss_ang
-            print("  {} / {} angle accuracy".format(correct_ang, imgs_t.size(0)))
-
+            print("  {} / {} angle accuracy for this mb".format(correct_ang,
+                    imgs_t.size(0)))
             _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
-                         out_ang, ang_predict, loss, phase='valid')
+                    out_ang, ang_predict, loss, phase='valid')
 
+    print("Just finished saving validation images! Look at: {}".format(opt.VALID_TMPDIR))
     return act_predictor, all_train, all_valid
 
 
@@ -322,21 +337,23 @@ if __name__ == "__main__":
 
     # Rely on several options for the loss type. See network class for details.
     pp.add_argument('--model_type', type=int, default=1)
-
     args = pp.parse_args() 
     # --------------------------------------------------------------------------
-    torch.manual_seed(args.seed)
 
+    # Bells and whistles, saving stuff, etc.
+    torch.manual_seed(args.seed)
     save_dir = opt.get_save_dir(args)
     print("Saving in: {}".format(save_dir))
+    _save_cfg(join(save_dir, 'options.txt'))
+
+    # Get pre-trained model and train!
     resnet = opt.get_pretrained_model(args)
     act_predictor, stats_train, stats_valid = train(resnet, args)
 
     # https://pytorch.org/tutorials/beginner/saving_loading_models.html
     torch.save(act_predictor.state_dict(), join(save_dir,'act_predictor.pt'))
-
     with open(join(save_dir,'stats_train.pkl'), 'w') as fh:
         pickle.dump(stats_train, fh)
     with open(join(save_dir,'stats_valid.pkl'), 'w') as fh:
         pickle.dump(stats_valid, fh)
-    print("Done! Recall that we saved at: {}".format(save_dir))
+    print("\nDone! Look at this directory for results:\n{}".format(save_dir))

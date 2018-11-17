@@ -134,7 +134,6 @@ class Rescale(object):
 
 class RandomCrop(object):
     """Crop randomly the image in a sample. LGTM.
-
     For this, we do similar croppings for both images.
 
     Args:
@@ -375,10 +374,17 @@ def _save_viz(sample, idx, istrain):
     int(target_xy[0]),int(target_xy[1])
     cv2.arrowedLine(img_t, targ, goal, color=opt.BLUE, thickness=2)
     cv2.putText(img=img_t, 
-                text="raw ang: {}".format(raw_ang),
+                text="raw_ang: {}".format(raw_ang),
                 org=(10,20),
                 fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
-                fontScale=0.75, 
+                fontScale=0.6, 
+                color=opt.GREEN,
+                thickness=1)
+    cv2.putText(img=img_tp1, 
+                text="targ_xy: {}".format(targ),
+                org=(10,20),
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
+                fontScale=0.6, 
                 color=opt.GREEN,
                 thickness=1)
 
