@@ -28,7 +28,7 @@ def _deprocess(img):
    
 
 def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
-                 out_ang, ang_predict, loss, phase='valid'):
+                 out_ang, ang_predict, loss, batch_num, phase='valid'):
     """Debugging the data transforms, labels, net predictions, etc.
  
     OpenCV can't save if you use floats. You need: `img = img.astype(int)`.
@@ -123,7 +123,7 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
 
         # Combine images (t,tp1) together and save.
         hstack = np.concatenate((img, img_tp1), axis=1)
-        fname = '{}/{}_{}_{:.0f}.png'.format(opt.VALID_TMPDIR, phase, str(b).zfill(4), L2_pix)
+        fname = '{}/{}_{}_{}_{:.0f}.png'.format(opt.VALID_TMPDIR, phase, str(batch_num).zfill(3), str(b).zfill(4), L2_pix)
         cv2.imwrite(fname, hstack)
     print("Just finished saving validation images! Look at: {}".format(opt.VALID_TMPDIR))
 
@@ -284,10 +284,11 @@ def train(pretrained_model, args):
     act_predictor.eval()
     print("\nVisualizing performance of best model on validation set:")
 
+    batch_num = 0
     for minibatch in dataloaders['valid']:
-        imgs_t     = (mb['img_t']).to(device)
-        imgs_tp1   = (mb['img_tp1']).to(device)
-        labels     = (mb['label']).to(device)
+        imgs_t     = (minibatch['img_t']).to(device)
+        imgs_tp1   = (minibatch['img_tp1']).to(device)
+        labels     = (minibatch['label']).to(device)
         labels_pos = labels[:,:2].float()
         labels_ang = torch.squeeze(labels[:,2:].long())
 
@@ -303,7 +304,8 @@ def train(pretrained_model, args):
             print("  {} / {} angle accuracy".format(correct_ang, imgs_t.size(0)))
 
             _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
-                         out_ang, ang_predict, loss, phase='valid')
+                         out_ang, ang_predict, loss, batch_num, phase='valid')
+            batch_num += 1
 
     return act_predictor, all_train, all_valid
 
