@@ -141,7 +141,7 @@ def deploy(act_predictor):
 if __name__ == "__main__":
     # Pick the model that we want to load.
     HEAD  = '/nfs/diskstation/seita/bedmake_ssl'
-    MODEL = 'resnet18_2018-11-17-13-01_000'
+    MODEL = 'resnet18_2018-11-18-09-50_000'
     PATH  = join(HEAD, MODEL, 'act_predictor.pt')
 
     # Get old args we used, and put into a newer Namespace object.
