@@ -53,7 +53,7 @@ class BedMaker():
         similarities in code structure.
         """
         self.args = args
-        DEBUG = True
+        DEBUG = True # TODO: switch to a logger so debug mode handled easily
 
         # Set up the robot.
         self.robot = robot = hsrb_interface.Robot()
@@ -136,7 +136,6 @@ class BedMaker():
         self.img_final = None
         self.img_start2 = None
         self.img_final2 = None
-
 
         # For grasp offsets.
         self.apply_offset = False

@@ -1,7 +1,7 @@
 """For the PHYSICAL robot, tentative results.
 """
 import torch
-import argparse, copy, cv2, json, os, sys, time, pickle
+import argparse, copy, cv2, json, os, sys, time, pickle, logging
 import time, datetime
 import numpy as np
 from os.path import join
@@ -13,7 +13,6 @@ from hsr_core.utils import process_depth
 from il_ros_hsr.nets.net import ActPredictorNet
 from il_ros_hsr.nets import options as opt
 from il_ros_hsr.nets import custom_transforms as CT
-
 
 
 ###def transform_imgs(img_t, img_tp1, transform):
@@ -106,6 +105,14 @@ from il_ros_hsr.nets import custom_transforms as CT
 ###    deploy(act_predictor)
 
 
+
+
+
+
+# Will put in `options.py` later
+TARGET_DIR = 'tmp_physical_targs'
+
+
 class DataCollector:
 
     def __init__(self, args):
@@ -138,193 +145,55 @@ class DataCollector:
         return (c_img, d_img, d_img_proc)
 
 
-    ##def collect_data(self, ep, ts): ##    """Does one instance of data collection, then saves. ep=episode, ts=time_step.
-    ##    """
-    ##    (c_img, d_img, d_img_proc) = self.get_images()
-    ##    pth1 = join(TARGET_DIR, 'c_img_{}_{}.png'.format(str(ep).zfill(2), str(ts).zfill(3)))
-    ##    pth2 = join(TARGET_DIR, 'd_img_{}_{}.png'.format(str(ep).zfill(2), str(ts).zfill(3)))
-    ##    pth3 = join(TARGET_DIR, 'd_img_proc_{}_{}.png'.format(str(ep).zfill(2), str(ts).zfill(3))) ##    self.data[(ep, ts)] = {"image": d_img_proc, "action": None} ##    cv2.imwrite(pth1, c_img)
-    ##    cv2.imwrite(pth2, d_img)
-    ##    cv2.imwrite(pth3, d_img_proc)
-
-
-    ##def record_action(self, action, episode, time_step): 
-    ##    """Saves a_t, the action vector at time t = self.idx: [grasp_x, grasp_y, angle, length]
-    ##    """
-    ##    self.data[(episode, time_step)]["action"] = \
-    ##            {'x': action[0], 'y': action[1], 'angle': action[2], 'length': action[3]}
-
-
-    ##def pickle(self):
-    ##    with open(os.path.join(TARGET_DIR, 'rollout2.pkl'), 'wb') as handle:
-    ##        pickle.dump(self.data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-    ##def display_episode(self, image, episode_num):
-    ##    """Shows an image between data collection episodes notifying the user to reset the blanket.
-    ##    """
-    ##    cv2.imshow("EPISODE {} STARTING. Please reset blanket position, then press any key.".format(str(episode_num)), image)
-    ##    cv2.waitKey()
-    ##    cv2.destroyAllWindows()
-
-
-    ##def compute_grasps(self):
-    ##    self.data = pickle.load(open('/nfs/diskstation/ryanhoque/ssldata/rollout.pkl', 'rb'))
-    ##    for k in self.data:
-    ##        image = cv2.imread('/nfs/diskstation/ryanhoque/ssldata/c_img_{}_{}.png'.format(
-    ##                str(k[0]).zfill(2), str(k[1]).zfill(3)))
-    ##        cv2.imshow("", image)
-    ##        cv2.waitKey()
-    ##        cv2.destroyAllWindows()
-    ##        try:
-    ##            x, y = red_contour(image)
-    ##        except: # cannot find red contour, so enter it manually
-    ##            cv2.imshow("", image)
-    ##            cv2.waitKey()
-    ##            cv2.destroyAllWindows()
-    ##            print("error: cannot find contour")
-    ##            x = int(raw_input("enter x pixel\n"))
-    ##            y = int(raw_input("enter y pixel\n"))
-    ##        if self.data[k]["action"]:
-    ##            self.data[k]["action"]['x'] = x
-    ##            self.data[k]["action"]['y'] = y
-
-
     def get_target_images(self):
-        """Runs the pipeline for deployment, testing out bed-making.
+        """Get a series of target images, stopping only when user wishes to
+        abort (via pressing ESC key).
+
+        Note, in phase 1, we will just add onto existing indices in saved target
+        dir. We assume that we can sort these, then extract the index from the
+        last element.
         """
-        # Get the starting image (from USB webcam). Try a second as well.
-        cap = cv2.VideoCapture(0)
-        frame = None
-        while frame is None:
-            ret, frame = cap.read()
-            cv2.waitKey(50)
-        self.image_start = frame
-        cv2.imwrite('image_start.png', self.image_start)
-
-        _, frame = cap.read()
-        self.image_start2 = frame
-        cv2.imwrite('image_start2.png', self.image_start2)
-
-        cap.release()
-        print("NOTE! Recorded `image_start` for coverage evaluation. Was it set up?")
-
-        def get_pose(data_all):
-            # See `find_pick_region_labeler` in `p_pi/bed_making/gripper.py`.
-            # It's because from the web labeler, we get a bunch of objects.
-            # So we have to compute the pose (x,y) from it.
-            res = data_all['objects'][0]
-            x_min = float(res['box'][0])
-            y_min = float(res['box'][1])
-            x_max = float(res['box'][2])
-            y_max = float(res['box'][3])
-            x = (x_max - x_min)/2.0 + x_min
-            y = (y_max - y_min)/2.0 + y_min
-            return (x,y)
-
         args = self.args
-        use_d = BED_CFG.GRASP_CONFIG.USE_DEPTH
-        self.get_new_grasp = True
-        self.new_grasp = True
-        self.rollout_stats = [] # What we actually save for analysis later
+        if not os.path.exists(TARGET_DIR):
+            os.makedirs(TARGET_DIR)
+        digits = 3
 
-        # Add to self.rollout_stats at the end for more timing info
-        self.g_time_stats = []      # for _execution_ of a grasp
-        self.move_time_stats = []   # for moving to the other side
+        # Get the index we should start with for saving imgs.
+        saved_imgs = sorted([x for x in os.listdir(TARGET_DIR)])
+        if len(saved_imgs) == 0:
+            idx = 0
+        else:
+            saved_img_noext = (saved_imgs[0]).replace('.png','')
+            idx = int( (saved_img_noext.split('_'))[-1] )
 
         while True:
-            c_img = self.cam.read_color_data()
-            d_img = self.cam.read_depth_data()
+            c_img, d_img, d_img_proc = self.get_images()
 
-            if (not c_img.all() == None and not d_img.all() == None):
-                if self.new_grasp:
-                    self.position_head()
-                else:
-                    self.new_grasp = True
-                time.sleep(3)
+            if (c_img.all() is not None) and (d_img.all() is not None):
+                # Once we get here, we've saved the images. BUT, since the code
+                # stops here, we should change the bed making setup. THEN we
+                # press any key. This way, next time step has the new images.
+                caption = 'Here is data (ESC to abort). NOTE: CHANGE THE IMAGE for next time step'
+                opt.call_wait_key( cv2.imshow(caption, d_img_proc) )
 
-                c_img = self.cam.read_color_data()
-                d_img = self.cam.read_depth_data()
-                d_img_raw = np.copy(d_img) # Needed for determining grasp pose
-
-                # --------------------------------------------------------------
-                # Process depth images! Helps network, human, and (presumably) analytic.
-                # Obviously human can see the c_img as well ... hard to compare fairly.
-                # --------------------------------------------------------------
-                if use_d:
-                    if np.isnan(np.sum(d_img)):
-                        cv2.patchNaNs(d_img, 0.0)
-                    d_img = depth_to_net_dim(d_img, robot='HSR')
-                    policy_input = np.copy(d_img)
-                else:
-                    policy_input = np.copy(c_img)
-
-                # --------------------------------------------------------------
-                # Run grasp detector to get data=(x,y) point for target, record stats.
-                # Note that the web labeler returns a dictionary like this:
-                # {'objects': [{'box': (155, 187, 165, 194), 'class': 0}], 'num_labels': 1}
-                # but we really want just the 2D grasping point. So use `get_pose()`.
-                # Also, for the analytic one, we'll pick the highest point ourselves.
-                # --------------------------------------------------------------
-                sgraspt = time.time()
-                if args.g_type == 'network':
-                    data = self.g_detector.predict(policy_input)
-                elif args.g_type == 'analytic':
-                    data_all = self.wl.label_image(policy_input)
-                    data = get_pose(data_all)
-                elif args.g_type == 'human':
-                    data_all = self.wl.label_image(policy_input)
-                    data = get_pose(data_all)
-                egraspt = time.time()
-
-                g_predict_t = egraspt - sgraspt
-                print("Grasp predict time: {:.2f}".format(g_predict_t))
-                self.record_stats(c_img, d_img_raw, data, self.side, g_predict_t, 'grasp')
-
-                # For safety, we can check image and abort as needed before execution.
-                if use_d:
-                    img = self.dp.draw_prediction(d_img, data)
-                else:
-                    img = self.dp.draw_prediction(c_img, data)
-                caption = 'G Predicted: {} (ESC to abort, other key to proceed)'.format(data)
-                call_wait_key( cv2.imshow(caption,img) )
-
-                # --------------------------------------------------------------
-                # Broadcast grasp pose, execute the grasp, check for success.
-                # We'll use the `find_pick_region_net` since the `data` is the
-                # (x,y) pose, and not `find_pick_region_labeler`.
-                # --------------------------------------------------------------
-                self.gripper.find_pick_region_net(pose=data,
-                                                  c_img=c_img,
-                                                  d_img=d_img_raw,
-                                                  count=self.grasp_count,
-                                                  side=self.side,
-                                                  apply_offset=self.apply_offset)
-                pick_found, bed_pick = self.check_card_found()
-
-                if self.side == "BOTTOM":
-                    self.whole_body.move_to_go()
-                    self.tt.move_to_pose(self.omni_base,'lower_start')
-                    tic = time.time()
-                    self.gripper.execute_grasp(bed_pick, self.whole_body, 'head_down')
-                    toc = time.time()
-                else:
-                    self.whole_body.move_to_go()
-                    self.tt.move_to_pose(self.omni_base,'top_mid')
-                    tic = time.time()
-                    self.gripper.execute_grasp(bed_pick, self.whole_body, 'head_up')
-                    toc = time.time()
-                self.g_time_stats.append( toc-tic )
-                self.check_success_state(policy_input)
+                sidx = str(idx).zfill(digits)
+                pth1 = join(TARGET_DIR, 'c_img_{}.png'.format(sidx))
+                pth2 = join(TARGET_DIR, 'd_img_{}.png'.format(sidx))
+                pth3 = join(TARGET_DIR, 'd_img_proc_{}.png'.format(sidx))
+                cv2.imwrite(pth1, c_img)
+                cv2.imwrite(pth2, d_img)
+                cv2.imwrite(pth3, d_img_proc)
+                print("Saved:")
+                print("  {}".format(pth1))
+                print("  {}".format(pth2))
+                print("  {}".format(pth3))
+                idx += 1
 
 
 if __name__ == "__main__":
     # --------------------------------------------------------------------------
     pp = argparse.ArgumentParser()
-    pp.add_argument('--phase', type=int, help='1 for checking images/poses, 2 for deployment.')
-    ##pp.add_argument('--g_type', type=str, help='must be in [network, human, analytic]')
-    ##pp.add_argument('--use_rgb', action='store_true', default=False,
-    ##    help='If doing this, we need to use the rgb network.')
+    pp.add_argument('--phase', type=int, help='see code and README docs')
     args = pp.parse_args()
     assert args.phase in [1,2]
     # --------------------------------------------------------------------------
@@ -333,7 +202,10 @@ if __name__ == "__main__":
     dc.orient_robot()
 
     if args.phase == 1:
-        # First, focus on getting a set of target images for the robot.
+        # First, focus on getting a set of target images for the robot. Easy to
+        # do it here because we assume that once we're done the robot is in the
+        # same position for the next phase (trying to grasp and pull) so we do
+        # not have to worry about position and orientation issues.
         dc.get_target_images()
     else:
         raise NotImplementedError()

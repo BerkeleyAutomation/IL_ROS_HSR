@@ -3,7 +3,7 @@ Use capital letters for variables, e.g. for data paths, image types, etc. Those
 are put into `options.txt` when training, helping us to reproduce results.
 """
 import torchvision.models as models
-import argparse, os, datetime, json, sys
+import argparse, cv2, os, datetime, json, sys
 
 # ------------------------------------------------------------------------------
 # Options for training
@@ -79,6 +79,7 @@ error_kw = dict(lw=4, capsize=5, capthick=3)
 # Utility methods
 # ------------------------------------------------------------------------------
 
+ESC_KEYS = [27, 1048603]
 
 def get_pretrained_model(args):
     """Pre-trained model.
@@ -114,6 +115,8 @@ def get_save_dir(args):
 
 
 def debug_state_dict(model):
+    """Debugging PyTorch models; this inspects parameter names.
+    """
     print("\nHere are the keys in this model's `state_dict()`:\n")
     for key in model.state_dict():
         print(key)
@@ -121,7 +124,18 @@ def debug_state_dict(model):
 
 
 def _json_to_args(jsonfile):
+    """For converting saved json to args namespace.
+    """
     args = argparse.Namespace()
     args.pretrained_model = jsonfile['pretrained_model']
     args.model_type       = jsonfile['model_type']
     return args
+
+
+def call_wait_key(nothing=None):
+    """Call this like: `call_wait_key( cv2.imshow(...) )`.
+    """
+    key = cv2.waitKey(0)
+    if key in ESC_KEYS:
+        print("Pressed ESC key. Terminating program...")
+        sys.exit()
