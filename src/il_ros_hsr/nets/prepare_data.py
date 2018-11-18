@@ -227,10 +227,10 @@ def prepare_ssldata2_with_cv():
     os.makedirs(path_valid)
 
     # For data loader, need to go from index to target, for BOTH train and valid.
-    loader_train_path = join(opt.NEW_DATA_SSL,'train','data_train_loader.pkl')
-    loader_valid_path = join(opt.NEW_DATA_SSL,'valid','data_valid_loader.pkl')
-    loader_train_dict = dict()
-    loader_valid_dict = dict()
+    loader_train_path = join(opt.NEW_DATA_SSL,'train','data_train_loader')
+    loader_valid_path = join(opt.NEW_DATA_SSL,'valid','data_valid_loader')
+    loader_train_dict = []
+    loader_valid_dict = []
     total_train = 0
     total_valid = 0
 
@@ -259,12 +259,13 @@ def prepare_ssldata2_with_cv():
         NUM_ACTIONS = 20
 
         for split in range(NUM_EPISODES):
-            loader_train_dict[split] = []
-            loader_valid_dict[split] = []
+            loader_train_dict.append([])
+            loader_valid_dict.append([])
             for e in range(NUM_EPISODES):
                 for a in range(NUM_ACTIONS):
                     if (e + 1, a) in idx_to_skip:
-                        print("skipping {}-{}".format(e + 1, a))
+                        if split == 0: # only print skipped values once
+                            print("skipping {}-{}".format(e + 1, a))
                         continue
                     s_t   = data[(e + 1, a)]['image']
                     a_t   = data[(e + 1, a)]['action']
@@ -290,11 +291,10 @@ def prepare_ssldata2_with_cv():
                         loader_valid_dict[split].append( (png_t, png_tp1, a_t) )
                     else:
                         loader_train_dict[split].append( (png_t, png_tp1, a_t) )
-
-    with open(loader_train_path, 'w') as fh:
-        pickle.dump(loader_train_dict, fh)
-    with open(loader_valid_path, 'w') as fh:
-        pickle.dump(loader_valid_dict, fh)
+            with open("{}-{}.pkl".format(loader_train_path, split), 'w') as fh:
+                pickle.dump(loader_train_dict[split], fh)
+            with open("{}-{}.pkl".format(loader_valid_path, split), 'w') as fh:
+                pickle.dump(loader_valid_dict[split], fh)
 
     print("done loading data for {}-fold cross validation".format(NUM_EPISODES))
     numbers = np.array([numbers_0,numbers_1,numbers_2]) # Will be shape (3,D)

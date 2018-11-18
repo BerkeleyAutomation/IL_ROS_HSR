@@ -27,6 +27,21 @@ def _deprocess(img):
     return img
    
 
+def _save_cfg(config_path):
+    """Saves `options.txt` which provides info from the `options.py` file.
+    Helps us in case we need to figure out what settings we ran for this.
+    To be clear, this is not the `args` but what was in `options.py`.
+    """
+    avoid = ['BLUE', 'GREEN', 'RED', 'BLACK', 'WHITE']
+    with open(config_path, 'w') as f:
+        # i.e., the variables in `il_ros_hsr.nets.options`
+        cfg_dict = opt.__dict__
+        for key in sorted(cfg_dict.keys()):
+            if key[0].isupper() and key not in avoid:
+                cfg_str = '{}: {}\n'.format(key, cfg_dict[key])
+                f.write(cfg_str)
+
+
 def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
                  out_ang, ang_predict, loss, batch_num, phase='valid'):
     """Debugging the data transforms, labels, net predictions, etc.
@@ -79,10 +94,10 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
         # Overlay prediction vs target.
         # Using `img` gets a weird OpenCV error, I had to add 'contiguous' here.
         img = np.ascontiguousarray(img_t, dtype=np.uint8)
-        cv2.circle(img, center=targ_pos_int, radius=2, color=(0,0,255), thickness=-1)
-        cv2.circle(img, center=targ_pos_int, radius=3, color=(0,0,0),   thickness=1)
-        cv2.circle(img, center=pred_pos_int, radius=2, color=(255,0,0), thickness=-1)
-        cv2.circle(img, center=pred_pos_int, radius=3, color=(0,255,0), thickness=1)
+        cv2.circle(img, center=targ_pos_int, radius=2, color=opt.RED,   thickness=-1)
+        cv2.circle(img, center=targ_pos_int, radius=3, color=opt.BLACK, thickness=1)
+        cv2.circle(img, center=pred_pos_int, radius=2, color=opt.BLUE,  thickness=-1)
+        cv2.circle(img, center=pred_pos_int, radius=3, color=opt.GREEN, thickness=1)
 
         # This is the direction. Don't worry about the length, we can't easily get
         # it in pixel space and we keep length in world-space roughly fixed anyway.
@@ -115,7 +130,7 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
 
         cv2.putText(img=img, 
                     text="pred pos: {}".format(pred_pos_int),
-                    org=(10,10),
+                    org=(10,15),
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
                     fontScale=0.5, 
                     color=opt.GREEN,
@@ -125,7 +140,6 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
         hstack = np.concatenate((img, img_tp1), axis=1)
         fname = '{}/{}_{}_{}_{:.0f}.png'.format(opt.VALID_TMPDIR, phase, str(batch_num).zfill(3), str(b).zfill(4), L2_pix)
         cv2.imwrite(fname, hstack)
-    print("Just finished saving validation images! Look at: {}".format(opt.VALID_TMPDIR))
 
 
 def _log(phase, ep_loss, ep_loss_pos, ep_loss_ang, ep_correct_ang):
@@ -136,8 +150,27 @@ def _log(phase, ep_loss, ep_loss_pos, ep_loss_ang, ep_correct_ang):
     print("loss_ang:    {:.4f}".format(ep_loss_ang))
     print("correct_ang: {:.4f}".format(ep_correct_ang))
 
-
 def train(pretrained_model, args):
+    if args.holdout:
+        return _train(pretrained_model, args, TRAIN_INFO, VALID_INFO)
+    else:
+        folds = []
+        for i in range(10):
+            folds.append(_train(copy.deepcopy(pretrained_model), args, 
+                   join(opt.NEW_DATA_SSL, 'train/data_train_loader-{}.pkl'.format(i)),
+                   join(opt.NEW_DATA_SSL, 'valid/data_valid_loader-{}.pkl'.format(i)), i))
+        # return best weights, every all train, every all valid
+        # and print the average loss across folds
+        avg_loss = sum([min(f[2]['loss']) for f in folds]) / 10.0
+        print("AVERAGE VALIDATION LOSS: {}".format(avg_loss))
+        best_predictor = min(folds, key=lambda f: min(f[2]['loss']))[0]
+        all_train = [f[1] for f in folds]
+        all_valid = [f[2] for f in folds]
+        return best_predictor, all_train, all_valid
+
+def _train(pretrained_model, args, train_infodir, valid_infodir, val_num=-1):
+    if val_num > -1:
+        print("Fold #{}".format(val_num))
     # To debug transformation(s), look at `custom_transforms.py`.
     transforms_train = transforms.Compose([
         CT.Rescale((256,256)),
@@ -153,8 +186,8 @@ def train(pretrained_model, args):
         CT.Normalize(opt.MEAN, opt.STD),
     ])
 
-    gdata_t = CT.BedGraspDataset(infodir=TRAIN_INFO, transform=transforms_train)
-    gdata_v = CT.BedGraspDataset(infodir=VALID_INFO, transform=transforms_valid)
+    gdata_t = CT.BedGraspDataset(infodir=train_infodir, transform=transforms_train)
+    gdata_v = CT.BedGraspDataset(infodir=valid_infodir, transform=transforms_valid)
 
     dataloaders = {
         'train': DataLoader(gdata_t, batch_size=32, shuffle=True, num_workers=8),
@@ -285,10 +318,10 @@ def train(pretrained_model, args):
     print("\nVisualizing performance of best model on validation set:")
 
     batch_num = 0
-    for minibatch in dataloaders['valid']:
-        imgs_t     = (minibatch['img_t']).to(device)
-        imgs_tp1   = (minibatch['img_tp1']).to(device)
-        labels     = (minibatch['label']).to(device)
+    for mb in dataloaders['valid']:
+        imgs_t     = (mb['img_t']).to(device)
+        imgs_tp1   = (mb['img_tp1']).to(device)
+        labels     = (mb['label']).to(device)
         labels_pos = labels[:,:2].float()
         labels_ang = torch.squeeze(labels[:,2:].long())
 
@@ -301,12 +334,15 @@ def train(pretrained_model, args):
             loss_pos = criterion_mse(out_pos, labels_pos)
             loss_ang = criterion_cent(out_ang, labels_ang)
             loss = loss_pos + loss_ang
-            print("  {} / {} angle accuracy".format(correct_ang, imgs_t.size(0)))
-
+            print("  {} / {} angle accuracy for this mb".format(correct_ang,
+                    imgs_t.size(0)))
+	    if val_num >= 0: # we are doing CV, so save images by fold number
+                batch_num = val_num
             _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
-                         out_ang, ang_predict, loss, batch_num, phase='valid')
+                         out_ang, ang_predict, loss, val_num, phase='valid')
             batch_num += 1
 
+    print("Just finished saving validation images! Look at: {}".format(opt.VALID_TMPDIR))
     return act_predictor, all_train, all_valid
 
 
@@ -316,6 +352,7 @@ if __name__ == "__main__":
     pp.add_argument('--pretrained_model', type=str, default='resnet18')
     pp.add_argument('--num_epochs', type=int, default=30)
     pp.add_argument('--seed', type=int, default=0)
+    pp.add_argument('--holdout', action='store_true', default=False)
 
     # If changing the optimizer, the learning rate must be adjusted as well.
     # I think ~1e-4 for Adam, ~1e-2 for SGD. Adam generally needs lower LRs.
@@ -324,21 +361,23 @@ if __name__ == "__main__":
 
     # Rely on several options for the loss type. See network class for details.
     pp.add_argument('--model_type', type=int, default=1)
-
     args = pp.parse_args() 
     # --------------------------------------------------------------------------
-    torch.manual_seed(args.seed)
 
+    # Bells and whistles, saving stuff, etc.
+    torch.manual_seed(args.seed)
     save_dir = opt.get_save_dir(args)
     print("Saving in: {}".format(save_dir))
+    _save_cfg(join(save_dir, 'options.txt'))
+
+    # Get pre-trained model and train!
     resnet = opt.get_pretrained_model(args)
     act_predictor, stats_train, stats_valid = train(resnet, args)
 
     # https://pytorch.org/tutorials/beginner/saving_loading_models.html
     torch.save(act_predictor.state_dict(), join(save_dir,'act_predictor.pt'))
-
     with open(join(save_dir,'stats_train.pkl'), 'w') as fh:
         pickle.dump(stats_train, fh)
     with open(join(save_dir,'stats_valid.pkl'), 'w') as fh:
         pickle.dump(stats_valid, fh)
-    print("Done! Recall that we saved at: {}".format(save_dir))
+    print("\nDone! Look at this directory for results:\n{}".format(save_dir))

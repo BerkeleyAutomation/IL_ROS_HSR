@@ -10,6 +10,8 @@ il_ros_hsr/nets/[script_name].py`, etc. The script will sometimes make temporary
 directories, prefixed with `tmp`, for visualization purposes. These can be
 removed.
 
+Here is the pipeline from data generation to deployment on the HSR.
+
 
 ## Step 1: Data Generation
 
@@ -22,7 +24,7 @@ removed.
   that the data be copied into a local directory on the computer one is using,
   for faster loading.
 
-- Depending on the dataset type, choose the method in `prepare_data.py` and then
+- Depending on the data type, choose the method in `prepare_data.py` and then
   run `python prepare_data.py`. This should generate a pickle file for the
   validation and testing set, with references to the full image paths (which,
   again, should be stored in a local directory for speed). Look at the [PyTorch
@@ -37,7 +39,8 @@ Notes:
 
 - `ryanhoque/ssldata` has only RGB images.
 
-- `ryanhoque/ssldata2` has RGB and depth images.
+- `ryanhoque/ssldata2` has RGB and depth images. I think we only support loading
+  depth images, though, but some of the depth images are noisier than usual.
 
 The above names should be synced with the method names in `prepare_data.py`.
 
@@ -50,11 +53,9 @@ then un-normalization for visualizations later). Also, did you inspect via
 
 ## Step 3: Training
 
-Run `python train_action_predictor.py`. But before doing so:
+Run `python train_action_predictor.py`. Note that:
 
-- Check the output directory for where the predictions are saved, so you can
-  plot the *quantitative* results and visualize the *qualitative* results.
-  
+ 
 - There are command line arguments. Test and see which ones work.
 
 - The actual Deep Convolutional Neural Network that we use is defined in
@@ -66,18 +67,24 @@ Run `python train_action_predictor.py`. But before doing so:
   running the script on Nov (i.e., represented by the number 11) 16 at 14:20
   (2:20pm).
 
-
+- The best validation-set predictions are overlaid on the validation images and
+  saved in a directory, so you can plot the *quantitative* results and visualize
+  the *qualitative* results.
+ 
 Additionally, inside the model directory, we save the args, PyTorch model (with
-the usual `.pt` extension), and the statistics encountered during training.
-Here is a possible output:
+the usual `.pt` extension), and the statistics encountered during training. We
+also save the command line args (`args`) and the options file (`options.txt`).
+This helps us know what settings we ran for training.  Here is a possible
+output:
 
 ```
-$ ls -lh resnet18_2018-11-16-16-53_000
+$ ls -lh /nfs/diskstation/seita/bedmake_ssl/resnet18_2018-11-17-12-57_000
 total 44M
--rw-rw-r-- 1 nobody nogroup  44M Nov 16 16:54 act_predictor.pt
--rw-rw-r-- 1 nobody nogroup  112 Nov 16 16:53 args.json
--rw-rw-r-- 1 nobody nogroup 1007 Nov 16 16:54 stats_train.pkl
--rw-rw-r-- 1 nobody nogroup 1007 Nov 16 16:54 stats_valid.pkl
+-rw-rw-r-- 1 nobody nogroup  44M Nov 17 12:58 act_predictor.pt
+-rw-rw-r-- 1 nobody nogroup  112 Nov 17 12:57 args.json
+-rw-rw-r-- 1 nobody nogroup  267 Nov 17 12:57 options.txt
+-rw-rw-r-- 1 nobody nogroup 1002 Nov 17 12:58 stats_train.pkl
+-rw-rw-r-- 1 nobody nogroup 1004 Nov 17 12:58 stats_valid.pkl
 ```
 
 
@@ -93,17 +100,25 @@ Use `stats_train.pkl` and `stats_valid.pkl` for plotting. For an example, see
 
 ## Step 5: Deployment on Physical Robot
 
-Before testing on the physical robot, please test in `deploy_test.py` on sample
-images.
+**Critical**: the images from the robot should be roughly seen from similar
+angles and positions as in the training data, and the data should be processed
+in the same way as the *validation set* images. Then, call the network, get the
+action, and "de-process" the action towards normal image-space. Then we convert
+that to robot space.
 
-Pick the path to the model that you want to use. Then, write a script
-elsewhere that loads the model in a similar manner as `deploy_test.py` here. In
-order to use it in the real robot, the images should be roughly seen from
-similar angles, and the data must be processed similarly. Then, call the
-network, get the action, and "de-process" the action towards normal image-space.
-Then we convert that to robot space.
+- Before testing on the physical robot, please test in `deploy_test.py` on
+  sample images.  It uses custom methods that let us go through the same
+  transforms as we did during training/validation, but lets us directly use it
+  from numpy images, which is easier to use in deployment. (Otherwise we'd have
+  to write the same train/valid pickle files that we did for training.)
 
-TODO
+Once the test deployment is working, use `deploy_physical.py` on the physical
+robot.
+
+- The robot must be on, connected via the same WiFi, and you must be in "hsrb
+  mode" obviously.
+
+- **TODO: the physical deployment script is not finished yet**
 
 
 [1]:https://github.com/BerkeleyAutomation/IL_ROS_HSR/tree/master/scripts/ryan_data_collection
