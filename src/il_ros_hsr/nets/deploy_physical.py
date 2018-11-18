@@ -215,41 +215,64 @@ class DataCollector:
 
 
     def deploy(self):
-        """Deploy!! Careful, did you run the first phases beforehand?
+        """Deploy!!
+        
+        Careful, did you run the first phases beforehand to check that (a) there
+        exist target images you can use, and (b) that the poses in rviz look
+        reasonable.
         """        
         # Pick images to try from the saved file, and then current image.
         pth_end = 'tmp_physical_targs/d_img_proc_001.png'
         img_end = cv2.imread(pth_end)
         c_img, d_img, d_img_proc = self.get_images()
+        assert c_img.shape == d_img_proc.shape == (480,640,3), c_img.shape
+        assert d_img.shape == (480,640), d_img.shape
 
         # Visualize current and target image initially.
-        caption = 'ESC to abort.'
+        caption1 = 'Full size images. ESC to abort, other key to proceed.'
         img_t = d_img_proc
-        hstack = np.concatenate((img_t, img_end), axis=1)
-        opt.call_wait_key( cv2.imshow(caption, hstack) )
+        hstack1 = np.concatenate((img_t, img_end), axis=1)
+        opt.call_wait_key( cv2.imshow(caption1, hstack1) )
 
         # Next, network predictions.
         t_input   = transform_imgs(img_t, img_end, self.transforms_valid)
         t_img_t   = t_input['img_t'].unsqueeze(0)    # after unsqueezes, both
         t_img_end = t_input['img_tp1'].unsqueeze(0)  # w/shape: (1,3,224,224)
         out_pos, out_ang = self.act_predictor(t_img_t, t_img_end)
-        assert t_img_t.shape == (1,3,224,224)
+        assert t_img_t.shape == t_img_end.shape == (1,3,224,224)
         out_pos = out_pos.cpu().detach().squeeze()
         out_ang = out_ang.cpu().detach().squeeze()
 
-        # Post-process to visualize for humans.
+        # Post-process to visualize for humans. See `deploy_test` for some
+        # earlier tests I did. We should eventually make it less dependent on
+        # hard-coded values, but only if we're changing the transforms.
         w, h = 224, 224
-        print(out_pos)
-        print(out_ang)
-        pred_pos_int = int(out_pos[0]*w), int(out_pos[1]*h)
-        print(pred_pos_int)
+        pred_pos_proc = int(out_pos[0]*w), int(out_pos[1]*h)
 
-        # TODO: ah, but we also have to get this aligned w/the original
-        # (480,,640) img?  and then there's the issue of how do we actually get
-        # the robot to go there? Didn't that require transforms involving the AR
-        # marker? Hope not. 
+        # Get predicted position w.r.t. the original (480,640)-sized image.
+        pred_pos = (pred_pos_proc[0] + 16, pred_pos_proc[1] + 16)
+        widthf  = 640.0 / 256.0
+        heightf = 480.0 / 256.0
+        pred_pos = ( int(pred_pos[0]*widthf), int(pred_pos[1]*heightf) )
 
-        # And then optionally repeat the process ...
+        # Show and visualize to the user.
+        caption2 = 'Predicted Pos on full image: {}'.format(pred_pos)
+        img = np.copy(img_t)
+        assert img.shape == (480,640,3), img.shape
+        cv2.circle(img, center=pred_pos, radius=4, color=opt.BLUE,  thickness=-1)
+        cv2.circle(img, center=pred_pos, radius=6, color=opt.GREEN, thickness=1)
+        hstack2 = np.concatenate((img, img_end), axis=1)
+        opt.call_wait_key( cv2.imshow(caption2, hstack2) )
+
+        # Some debugging/logging.
+        print("pred_pos for 224x224 img: {} (scaled {})".format(out_pos, pred_pos_proc))
+        print("pred_pos for 480x640 img: {}".format(pred_pos))
+        print("out angle (logits): {}".format(out_ang))
+
+        # TODO: execute on the physical robot
+
+        # And then optionally repeat the process and save ... that's trivial.
+        # TODO
 
 
 if __name__ == "__main__":
