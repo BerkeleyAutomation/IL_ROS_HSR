@@ -127,6 +127,29 @@ class DataCollector:
         print("Initialized the data collector! Resting for 2 seconds...")
         time.sleep(2)
 
+        # Hande the part about loading the network and pretrained model.
+        HEAD  = '/nfs/diskstation/seita/bedmake_ssl'
+        MODEL = 'resnet18_2018-11-18-09-50_000'
+        PATH  = join(HEAD, MODEL, 'act_predictor.pt')
+
+        # Get old args we used, and put into a newer Namespace object.
+        with open(join(HEAD, MODEL, 'args.json'), 'r') as fh:
+            saved_args = json.load(fh)
+        self.netargs = opt._json_to_args(jsonfile=saved_args)
+        
+        # Load the pretrained model.
+        model = opt.get_pretrained_model(self.netargs)
+        self.act_predictor = ActPredictorNet(model, self.netargs)
+        self.act_predictor.load_state_dict(torch.load(PATH))
+        self.act_predictor.eval()
+
+        self.transforms_valid = transforms.Compose([
+            CT.Rescale((256,256)),
+            CT.CenterCrop((224,224)),
+            CT.ToTensor(),
+            CT.Normalize(opt.MEAN, opt.STD),
+        ])
+
 
     def orient_robot(self):
         """Orients the robot so that it is in a good position to take pictures.
@@ -193,60 +216,40 @@ class DataCollector:
 
     def deploy(self):
         """Deploy!! Careful, did you run the first phases beforehand?
-        """
-        # Pick the model that we want to load.
-        HEAD  = '/nfs/diskstation/seita/bedmake_ssl'
-        MODEL = 'resnet18_2018-11-18-09-50_000'
-        PATH  = join(HEAD, MODEL, 'act_predictor.pt')
-        
-        # Get old args we used, and put into a newer Namespace object.
-        with open(join(HEAD, MODEL, 'args.json'), 'r') as fh:
-            saved_args = json.load(fh)
-        args = opt._json_to_args(jsonfile=saved_args)
-        
-        # Load the pretrained model. If you print state dict, these start with
-        # `layer` as that was the convention with the ResNet saved models.
-        model = opt.get_pretrained_model(args)
-        
-        # But now we use act predictor, with `pretrained_stem` in state dict.
-        act_predictor = ActPredictorNet(model, args)
-        act_predictor.load_state_dict(torch.load(PATH))
-        act_predictor.eval()
-
-        transforms_valid = transforms.Compose([
-            CT.Rescale((256,256)),
-            CT.CenterCrop((224,224)),
-            CT.ToTensor(),
-            CT.Normalize(opt.MEAN, opt.STD),
-        ])
-        
-        # Pick images to try from the saved file.
+        """        
+        # Pick images to try from the saved file, and then current image.
         pth_end = 'tmp_physical_targs/d_img_proc_001.png'
         img_end = cv2.imread(pth_end)
-
-        # Get current image 
         c_img, d_img, d_img_proc = self.get_images()
 
+        # Visualize current and target image initially.
         caption = 'ESC to abort.'
         img_t = d_img_proc
         hstack = np.concatenate((img_t, img_end), axis=1)
         opt.call_wait_key( cv2.imshow(caption, hstack) )
 
-        t_input   = transform_imgs(img_t, img_end, transforms_valid)
-        t_img_t   = t_input['img_t'].unsqueeze(0)    # after unsqueeze these are
-        t_img_end = t_input['img_tp1'].unsqueeze(0)  # both shape (1,3,224,224)
-        out_pos, out_ang = act_predictor(t_img_t, t_img_end)
+        # Next, network predictions.
+        t_input   = transform_imgs(img_t, img_end, self.transforms_valid)
+        t_img_t   = t_input['img_t'].unsqueeze(0)    # after unsqueezes, both
+        t_img_end = t_input['img_tp1'].unsqueeze(0)  # w/shape: (1,3,224,224)
+        out_pos, out_ang = self.act_predictor(t_img_t, t_img_end)
+        assert t_img_t.shape == (1,3,224,224)
+        out_pos = out_pos.cpu().detach().squeeze()
+        out_ang = out_ang.cpu().detach().squeeze()
 
+        # Post-process to visualize for humans.
         w, h = 224, 224
         print(out_pos)
         print(out_ang)
-        print(t_img_t.shape)
-        print(t_img_end.shape)
-        out_pos = out_pos.cpu().detach().squeeze()
-        out_ang = out_ang.cpu().detach().squeeze()
         pred_pos_int = int(out_pos[0]*w), int(out_pos[1]*h)
         print(pred_pos_int)
-        #_save_and_viz(pth_t, pth_end, img_t, img_end, out_pos, out_ang)
+
+        # TODO: ah, but we also have to get this aligned w/the original
+        # (480,,640) img?  and then there's the issue of how do we actually get
+        # the robot to go there? Didn't that require transforms involving the AR
+        # marker? Hope not. 
+
+        # And then optionally repeat the process ...
 
 
 if __name__ == "__main__":
