@@ -17,7 +17,7 @@ from collections import defaultdict
 
 TRAIN_INFO = join(opt.NEW_DATA_SSL,'train/data_train_loader.pkl')
 VALID_INFO = join(opt.NEW_DATA_SSL,'valid/data_valid_loader.pkl')
-
+TRAIN_CV = join(opt.NEW_DATA_SSL, 'data_train_loader')
 
 def _deprocess(img):
     """Undo the normalization, multiply by 255, then turn to int type."""
@@ -152,13 +152,11 @@ def _log(phase, ep_loss, ep_loss_pos, ep_loss_ang, ep_correct_ang):
 
 def train(pretrained_model, args):
     if args.holdout:
-        return _train(pretrained_model, args, TRAIN_INFO, VALID_INFO)
+        return _train(pretrained_model, args)
     else:
         folds = []
         for i in range(10):
-            folds.append(_train(copy.deepcopy(pretrained_model), args, 
-                   join(opt.NEW_DATA_SSL, 'train/data_train_loader-{}.pkl'.format(i)),
-                   join(opt.NEW_DATA_SSL, 'valid/data_valid_loader-{}.pkl'.format(i)), i))
+            folds.append(_train(copy.deepcopy(pretrained_model), args, i))
         # return best weights, every all train, every all valid
         # and print the average loss across folds
         avg_loss = sum([min(f[2]['loss']) for f in folds]) / 10.0
@@ -168,7 +166,7 @@ def train(pretrained_model, args):
         all_valid = [f[2] for f in folds]
         return best_predictor, all_train, all_valid
 
-def _train(pretrained_model, args, train_infodir, valid_infodir, val_num=-1):
+def _train(pretrained_model, args, val_num=-1):
     if val_num > -1:
         print("Fold #{}".format(val_num))
     # To debug transformation(s), look at `custom_transforms.py`.
@@ -186,8 +184,12 @@ def _train(pretrained_model, args, train_infodir, valid_infodir, val_num=-1):
         CT.Normalize(opt.MEAN, opt.STD),
     ])
 
-    gdata_t = CT.BedGraspDataset(infodir=train_infodir, transform=transforms_train)
-    gdata_v = CT.BedGraspDataset(infodir=valid_infodir, transform=transforms_valid)
+    if val_num > -1:
+        gdata_t = CT.BedGraspDataset(infodir=TRAIN_CV, transform=transforms_train, cv_idx=val_num)
+        gdata_v = CT.BedGraspDataset(infodir=TRAIN_CV, transform=transforms_valid, cv_idx=val_num, valid=True)
+    else:
+        gdata_t = CT.BedGraspDataset(infodir=TRAIN_INFO, transform=transforms_train)
+        gdata_v = CT.BedGraspDataset(infodir=VALID_INFO, transform=transforms_valid)
 
     dataloaders = {
         'train': DataLoader(gdata_t, batch_size=32, shuffle=True, num_workers=8),
