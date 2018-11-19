@@ -17,7 +17,7 @@ from collections import defaultdict
 
 TRAIN_INFO = join(opt.NEW_DATA_SSL,'train/data_train_loader.pkl')
 VALID_INFO = join(opt.NEW_DATA_SSL,'valid/data_valid_loader.pkl')
-
+TRAIN_CV = join(opt.NEW_DATA_SSL, 'data_train_loader')
 
 def _deprocess(img):
     """Undo the normalization, multiply by 255, then turn to int type."""
@@ -43,7 +43,7 @@ def _save_cfg(config_path):
 
 
 def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
-                 out_ang, ang_predict, loss, phase='valid'):
+                 out_ang, ang_predict, loss, batch_num, phase='valid'):
     """Debugging the data transforms, labels, net predictions, etc.
  
     OpenCV can't save if you use floats. You need: `img = img.astype(int)`.
@@ -138,7 +138,7 @@ def _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos,
 
         # Combine images (t,tp1) together and save.
         hstack = np.concatenate((img, img_tp1), axis=1)
-        fname = '{}/{}_{}_{:.0f}.png'.format(opt.VALID_TMPDIR, phase, str(b).zfill(4), L2_pix)
+        fname = '{}/{}_{}_{}_{:.0f}.png'.format(opt.VALID_TMPDIR, phase, str(batch_num).zfill(3), str(b).zfill(4), L2_pix)
         cv2.imwrite(fname, hstack)
 
 
@@ -150,8 +150,25 @@ def _log(phase, ep_loss, ep_loss_pos, ep_loss_ang, ep_correct_ang):
     print("loss_ang:    {:.4f}".format(ep_loss_ang))
     print("correct_ang: {:.4f}".format(ep_correct_ang))
 
-
 def train(pretrained_model, args):
+    if args.holdout:
+        return _train(pretrained_model, args)
+    else:
+        folds = []
+        for i in range(10):
+            folds.append(_train(copy.deepcopy(pretrained_model), args, i))
+        # return best weights, every all train, every all valid
+        # and print the average loss across folds
+        avg_loss = sum([min(f[2]['loss']) for f in folds]) / 10.0
+        print("AVERAGE VALIDATION LOSS: {}".format(avg_loss))
+        best_predictor = min(folds, key=lambda f: min(f[2]['loss']))[0]
+        all_train = [f[1] for f in folds]
+        all_valid = [f[2] for f in folds]
+        return best_predictor, all_train, all_valid
+
+def _train(pretrained_model, args, val_num=-1):
+    if val_num > -1:
+        print("Fold #{}".format(val_num))
     # To debug transformation(s), look at `custom_transforms.py`.
     transforms_train = transforms.Compose([
         CT.Rescale((256,256)),
@@ -167,8 +184,12 @@ def train(pretrained_model, args):
         CT.Normalize(opt.MEAN, opt.STD),
     ])
 
-    gdata_t = CT.BedGraspDataset(infodir=TRAIN_INFO, transform=transforms_train)
-    gdata_v = CT.BedGraspDataset(infodir=VALID_INFO, transform=transforms_valid)
+    if val_num > -1:
+        gdata_t = CT.BedGraspDataset(infodir=TRAIN_CV, transform=transforms_train, cv_idx=val_num)
+        gdata_v = CT.BedGraspDataset(infodir=TRAIN_CV, transform=transforms_valid, cv_idx=val_num, valid=True)
+    else:
+        gdata_t = CT.BedGraspDataset(infodir=TRAIN_INFO, transform=transforms_train)
+        gdata_v = CT.BedGraspDataset(infodir=VALID_INFO, transform=transforms_valid)
 
     dataloaders = {
         'train': DataLoader(gdata_t, batch_size=32, shuffle=True, num_workers=8),
@@ -298,6 +319,7 @@ def train(pretrained_model, args):
     act_predictor.eval()
     print("\nVisualizing performance of best model on validation set:")
 
+    batch_num = 0
     for mb in dataloaders['valid']:
         imgs_t     = (mb['img_t']).to(device)
         imgs_tp1   = (mb['img_tp1']).to(device)
@@ -316,8 +338,11 @@ def train(pretrained_model, args):
             loss = loss_pos + loss_ang
             print("  {} / {} angle accuracy for this mb".format(correct_ang,
                     imgs_t.size(0)))
+	    if val_num >= 0: # we are doing CV, so save images by fold number
+                batch_num = val_num
             _save_images(imgs_t, imgs_tp1, labels_pos, labels_ang, out_pos, 
-                    out_ang, ang_predict, loss, phase='valid')
+                         out_ang, ang_predict, loss, val_num, phase='valid')
+            batch_num += 1
 
     print("Just finished saving validation images! Look at: {}".format(opt.VALID_TMPDIR))
     return act_predictor, all_train, all_valid
@@ -329,6 +354,7 @@ if __name__ == "__main__":
     pp.add_argument('--pretrained_model', type=str, default='resnet18')
     pp.add_argument('--num_epochs', type=int, default=30)
     pp.add_argument('--seed', type=int, default=0)
+    pp.add_argument('--holdout', action='store_true', default=False)
 
     # If changing the optimizer, the learning rate must be adjusted as well.
     # I think ~1e-4 for Adam, ~1e-2 for SGD. Adam generally needs lower LRs.

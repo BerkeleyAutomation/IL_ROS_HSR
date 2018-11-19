@@ -289,10 +289,20 @@ class RandomHorizontalFlip(object):
 class BedGraspDataset(Dataset):
     """Custom dataset, inspired by Face Landmarks dataset."""
 
-    def __init__(self, infodir, transform=None):
+    def __init__(self, infodir, transform=None, cv_idx=-1, valid=False):
         self.infodir = infodir
-        with open(self.infodir, 'r') as fh:
-            self.data = pickle.load(fh)
+        if cv_idx == -1: # holdout
+            with open(self.infodir, 'r') as fh:
+                self.data = pickle.load(fh)
+        elif valid: # cross validation, and this is validation set
+            with open("{}-{}.pkl".format(self.infodir, cv_idx), 'r') as fh:
+                self.data = pickle.load(fh)
+        else: # cross validation, and this is the training set
+            self.data = []
+            for i in range(10):
+                if i != cv_idx:
+                    with open("{}-{}.pkl".format(self.infodir, i), 'r') as fh:
+                        self.data.extend(pickle.load(fh))
         self.transform = transform
 
     def __len__(self):

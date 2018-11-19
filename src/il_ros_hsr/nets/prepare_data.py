@@ -3,7 +3,6 @@ import numpy as np
 from os.path import join
 from il_ros_hsr.nets import options as opt
 
-
 def prepare_ssldata():
     """Create appropriate data for PyTorch, from Ryan's first data collection.
 
@@ -214,5 +213,88 @@ def prepare_ssldata2():
     print("std(scaled):  {}".format(np.std(numbers/255.0, axis=1)))
 
 
+def prepare_ssldata2_with_cv():
+    """Prepare data for cross validation (export each episode separately).
+    """
+    raw_data = join(opt.RAW_DATA_SSL,'rollout.pkl')
+    assert not os.path.exists(opt.NEW_DATA_SSL), \
+            "target exists, please remove it:\n\t{}".format(opt.NEW_DATA_SSL)
+    os.makedirs(opt.NEW_DATA_SSL)
+
+    # For data loader, need to go from index to target, for BOTH train and valid.
+    loader_train_path = join(opt.NEW_DATA_SSL,'data_train_loader')
+    loader_train_dict = []
+    total_train = 0
+
+    # Information needed for computing the normalization statistics.
+    numbers_0 = []
+    numbers_1 = []
+    numbers_2 = []
+
+    # There was one bad case in the second data collection.
+    idx_to_skip = [(8,0)]
+
+    # For Ryan's data it's a simple pickle file.
+    with open(raw_data, 'r') as fh:
+        data = pickle.load(fh)
+        N = len(data)
+        print("Just loaded: {}  (len: {})".format(raw_data, N))
+
+        # ----------------------------------------------------------------------
+        # Each `item` has 'image' and 'action' keys.
+        # Due to the (s_t, a_t, s_{t+1}) nature of data, we should think of
+        # this as iterating through actions. The actions are dicts like this:
+        # {'y': 302, 'x': 475, 'length': 20, 'angle': 0}, angles: 0,90,180,270.
+        # The `t` here is synced with `c_img_t.png`, fyi. We skip 0.
+        # ----------------------------------------------------------------------
+        NUM_EPISODES = 10
+        NUM_ACTIONS = 20
+
+        for e in range(NUM_EPISODES):
+            loader_train_dict.append([])
+            for a in range(NUM_ACTIONS):
+                if (e + 1, a) in idx_to_skip:
+                    print("skipping {}-{}".format(e + 1, a))
+                    continue
+                s_t   = data[(e + 1, a)]['image']
+                a_t   = data[(e + 1, a)]['action']
+                s_tp1 = data[(e + 1, a + 1)]['image']
+
+                # Accumulate statistics for mean and std computation across our
+                # lone channel. We made values same across all three channels.
+                assert s_t.shape == s_tp1.shape == (480,640,3)
+                numbers_0.extend( s_t[:,:,0].flatten() )
+                numbers_1.extend( s_t[:,:,1].flatten() )
+                numbers_2.extend( s_t[:,:,2].flatten() )
+
+                # Don't forget! Add info to our data loaders!! We need enough info
+                # to determine a full data point, which is a pair: `(input,target)`.
+                png_t   = join(opt.RAW_DATA_SSL,
+                               'd_img_proc_{}_{}.png'.format(str(e+1).zfill(2), str(a).zfill(3)))
+                png_tp1 = join(opt.RAW_DATA_SSL,
+                               'd_img_proc_{}_{}.png'.format(str(e+1).zfill(2), str(a + 1).zfill(3)))
+
+                # For actions just put `a_t` here and adjust in the data loader.
+                loader_train_dict[e].append( (png_t, png_tp1, a_t) )
+                total_train += 1
+            with open("{}-{}.pkl".format(loader_train_path, e), 'w') as fh:
+                pickle.dump(loader_train_dict[e], fh)
+
+    assert total_train == sum([len(i) for i in loader_train_dict])
+    print("done loading data for {}-fold cross validation".format(NUM_EPISODES))
+    numbers = np.array([numbers_0,numbers_1,numbers_2]) # Will be shape (3,D)
+    print("numbers.shape: {}  (for channel mean/std)".format(numbers.shape))
+    print("mean(numbers): {}".format(np.mean(numbers, axis=1)))
+    print("std(numbers):  {}".format(np.std(numbers, axis=1)))
+    print("\nBut, use this for actual mean/std because we want them in [0,256) ...")
+    print("mean(scaled): {}".format(np.mean(numbers/255.0, axis=1)))
+    print("std(scaled):  {}".format(np.std(numbers/255.0, axis=1)))
+
 if __name__ == "__main__":
-    prepare_ssldata2()
+    pp = argparse.ArgumentParser()
+    pp.add_argument('--holdout', action='store_true', default=False)
+    args = pp.parse_args()
+    if args.holdout:
+        prepare_ssldata2()
+    else:
+        prepare_ssldata2_with_cv()

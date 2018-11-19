@@ -19,8 +19,8 @@ assert IMG_TYPE in ['depth', 'bgr']
 # ------------------------------------------------------------------------------
 
 # For `prepare_data.py`
-RAW_DATA_SSL = 'ssldata2'
-NEW_DATA_SSL = 'ssldata2_pytorch'
+RAW_DATA_SSL = 'ssldata'
+NEW_DATA_SSL = 'ssldata_pytorch'
 
 # For `custom_transforms.py`, for data inspection after preparing the data.
 TRANSFORMS_TMPDIR = 'tmp_transforms_test/'
