@@ -6,8 +6,6 @@ import cPickle as pickle
 
 ###############CHANGGE FOR DIFFERENT PRIMITIVES#########################
 from il_ros_hsr.p_pi.bed_making.options import Bed_Options as Options 
-from il_ros_hsr.tensor.nets.net_ycb import Net_YCB as Net
-from il_ros_hsr.tensor.nets.net_ycb_vgg import Net_YCB_VGG as Net_VGG
 import il_ros_hsr.p_pi.bed_making.config_bed as cfg
 #########################################################################
 

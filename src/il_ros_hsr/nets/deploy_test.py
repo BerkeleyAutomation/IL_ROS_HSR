@@ -24,17 +24,20 @@ def _save_and_viz(pth_t, pth_tp1, img_t, img_tp1, out_pos, out_ang):
         os.makedirs(opt.DEPLOY_TMPDIR)
     b_pth_t   = os.path.basename(pth_t)
     b_pth_tp1 = os.path.basename(pth_tp1)
-    print("base pth_t:   {}".format(b_pth_t))
-    print("base pth_tp1: {}".format(b_pth_tp1))
+    print("base pth_t:             {}".format(b_pth_t))
+    print("base pth_tp1:           {}".format(b_pth_tp1))
     print("predicted position:     {}".format(out_pos))
     print("predicted angle logits: {}".format(out_ang))
+    print("img_tp1.shape:          {}".format(img_tp1.shape))
 
+    # --------------------------------------------------------------------------
     # The raw images
     hstack1 = np.concatenate((img_t, img_tp1), axis=1)
-    fname1 = join(opt.DEPLOY_TMPDIR,'{}_1.png'.format(b_pth_t))
+    fname1 = join(opt.DEPLOY_TMPDIR,'{}_v1.png'.format(b_pth_t))
     cv2.imwrite(fname1, hstack1)
     print("Look at: {}".format(fname1))
 
+    # --------------------------------------------------------------------------
     # Transformed images, but _without_ the tensor and normalization stuff.
     transforms_valid_notensors = transforms.Compose([
         CT.Rescale((256,256)),
@@ -44,13 +47,15 @@ def _save_and_viz(pth_t, pth_tp1, img_t, img_tp1, out_pos, out_ang):
     t_img_t   = t_input['img_t']
     t_img_tp1 = t_input['img_tp1']
     h, w, c = t_img_t.shape
+    assert t_img_t.shape == t_img_tp1.shape == (224,224,3), t_img_t.shape
 
     # Save the _transformed_ images.
     hstack2 = np.concatenate((t_img_t, t_img_tp1), axis=1)
-    fname2 = join(opt.DEPLOY_TMPDIR,'{}_2.png'.format(b_pth_t))
+    fname2 = join(opt.DEPLOY_TMPDIR,'{}_v2.png'.format(b_pth_t))
     cv2.imwrite(fname2, hstack2)
     print("Look at: {}".format(fname2))
 
+    # --------------------------------------------------------------------------
     # Overlay some stuff on the images (must de-process label, though).
     pred_pos_int = int(out_pos[0]*w), int(out_pos[1]*h)
     img = np.ascontiguousarray(t_img_t, dtype=np.uint8)
@@ -66,10 +71,38 @@ def _save_and_viz(pth_t, pth_tp1, img_t, img_tp1, out_pos, out_ang):
 
     # Save _transformed_ images, WITH predicted stuff overlaid on it.
     hstack3 = np.concatenate((img, t_img_tp1), axis=1)
-    fname3 = join(opt.DEPLOY_TMPDIR,'{}_3.png'.format(b_pth_t))
+    fname3 = join(opt.DEPLOY_TMPDIR,'{}_v3.png'.format(b_pth_t))
     cv2.imwrite(fname3, hstack3)
     print("Look at: {}".format(fname3))
-    print("PS, t_img_t.shape: {}".format(t_img_t.shape))
+
+    # --------------------------------------------------------------------------
+    # Finally let's save at the original resolution. This requires additional
+    # de-processing of the labels. Right now I add 16 to each coordinate since I
+    # know for validation, we went from (256,256) -> (224,224). Then we need to
+    # do additional stuff for (256,256) -> (480,640). Will need to fix if these
+    # are not the case in other scenarios ... 
+    # --------------------------------------------------------------------------
+    pos = (pred_pos_int[0] + 16, pred_pos_int[1] + 16)
+    widthf  = 640.0 / 256.0
+    heightf = 480.0 / 256.0
+    pos = ( int(pos[0]*widthf), int(pos[1]*heightf) )
+
+    img = np.copy(img_t)
+    cv2.circle(img, center=pos, radius=4, color=opt.BLUE,  thickness=-1)
+    cv2.circle(img, center=pos, radius=6, color=opt.GREEN, thickness=1)
+    cv2.putText(img=img, 
+                text="pred pos, original size: {}".format(pos),
+                org=(10,15),
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
+                fontScale=0.6, 
+                color=opt.GREEN,
+                thickness=1)
+
+    # Save _transformed_ images, WITH predicted stuff overlaid on it.
+    hstack4 = np.concatenate((img, img_tp1), axis=1)
+    fname4 = join(opt.DEPLOY_TMPDIR,'{}_v4.png'.format(b_pth_t))
+    cv2.imwrite(fname4, hstack4)
+    print("Look at: {}".format(fname4))
 
 
 def transform_imgs(img_t, img_tp1, transform):
@@ -125,8 +158,8 @@ def deploy(act_predictor):
     ])
 
     # Pick images to try here; careful, don't pick 'boundaries' of episodes.
-    pth_t   = 'ssldata2/d_img_proc_10_003.png'
-    pth_tp1 = 'ssldata2/d_img_proc_10_004.png'
+    pth_t   = 'ssldata2/d_img_proc_10_004.png'
+    pth_tp1 = 'ssldata2/d_img_proc_10_005.png'
     img_t   = cv2.imread(pth_t)
     img_tp1 = cv2.imread(pth_tp1)
 
@@ -141,7 +174,7 @@ def deploy(act_predictor):
 if __name__ == "__main__":
     # Pick the model that we want to load.
     HEAD  = '/nfs/diskstation/seita/bedmake_ssl'
-    MODEL = 'resnet18_2018-11-17-13-01_000'
+    MODEL = 'resnet18_2018-11-18-09-50_000'
     PATH  = join(HEAD, MODEL, 'act_predictor.pt')
 
     # Get old args we used, and put into a newer Namespace object.
