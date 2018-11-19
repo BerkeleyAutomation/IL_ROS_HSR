@@ -9,6 +9,7 @@ import torch
 from torchvision import transforms
 
 import rospy, hsrb_interface
+from hsrb_interface import geometry
 from hsr_core.sensors import RGBD
 from hsr_core.rgbd_to_map import RGBD2Map  # creates rgbd frame for camera pix -> world space
 from hsr_core.utils import process_depth
@@ -129,13 +130,22 @@ class DataCollector:
         self.whole_body = robot.get('whole_body')
         self.cam = RGBD()
         self.data = dict() # list of processed depth images and actions taken (I_t, a_t)
+
+        # We don't use directly, but it makes a frame that we need for pixels -> world grasp poses.
         self.rgbd_map = RGBD2Map() # makes frame we need but we don't use it otherwise
 
         # TODO: eventually we need to remove this. Doing this to let us go from
         # camera coordinates to world frame, but we need HSR_CORE to support it.
-        # But, should be easy because the grasp planner is pretty simple ...
+        # But, should be easy because the grasp planner is pretty simple and we
+        # only use it to compute the average depth values in a region.
         self.gp = GraspPlanner()
         self.gripper = Bed_Gripper(self.gp, self.cam, options=None, gripper=robot.get('gripper'))
+
+        # Also this is a bit hacky. We want the HSR to rotate so that it's
+        # _facing_ the bed now, whereas it started facing 'sideways'. Makes a
+        # target pose for the robot so it goes there, before grasp executiuon.
+        # TODO: make pose here. I think we can get away with rotating wrt the
+        # map but in general we want to create our own poses.
 
         print("Initialized the data collector! Resting for 2 seconds...")
         time.sleep(2)
@@ -286,10 +296,31 @@ class DataCollector:
         print("current idx for grasp pose: {}".format(idx))
         # TODO: later, save in a principled manner.
 
-        # TODO: execute on the physical robot. See `main/deploy.py` for details.
+        # Broadcast the target grasp onto world space. See `main/deploy.py` for details.
         self.gripper.find_pick_region_net(pred_pos, c_img, d_img, idx, 'BOTTOM')
         print("We have now broadcasted the bed_0 and bed_i_0 poses !!! Now execute grasp")
         time.sleep(1)
+
+        # Rotate the robot 90 degrees so it now faces the bed, w.r.t. the map frame.
+        self.omni_base.move(geometry.pose(ek=1.57), 500.0, ref_frame_id='map')
+
+        # TODO: execute the grasp, after rotating. See `main/deploy.py` for details.
+        # I think we can borrow this segment from `p_pi/bed_making/gripper.py`
+
+        ## whole_body.end_effector_frame = 'hand_palm_link'
+
+        ## # Hmmm ... might help with frequent table bumping? Higher = more arm movement.
+        ## whole_body.linear_weight = 60.0
+
+        ## whole_body.move_end_effector_pose(geometry.pose(),cards[0])
+        ## self.com.grip_squeeze(self.gripper)
+
+        ## # Then after we grip, go back to the default value.
+        ## whole_body.linear_weight = 3.0
+
+        ## # Then we pull.
+        ## self.tension.force_pull(whole_body,direction)
+        ## self.com.grip_open(self.gripper)
 
         # And then optionally repeat the process and save ... that's trivial.
         # TODO
