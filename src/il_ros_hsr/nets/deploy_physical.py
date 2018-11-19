@@ -10,10 +10,15 @@ from torchvision import transforms
 
 import rospy, hsrb_interface
 from hsr_core.sensors import RGBD
+from hsr_core.rgbd_to_map import RGBD2Map  # creates rgbd frame for camera pix -> world space
 from hsr_core.utils import process_depth
 from il_ros_hsr.nets.net import ActPredictorNet
 from il_ros_hsr.nets import options as opt
 from il_ros_hsr.nets import custom_transforms as CT
+
+# Ideally remove this later
+from il_ros_hsr.core.grasp_planner import GraspPlanner
+from il_ros_hsr.p_pi.bed_making.gripper import Bed_Gripper
 
 
 def _save_and_viz(pth_t, pth_tp1, img_t, img_tp1, out_pos, out_ang):
@@ -124,6 +129,14 @@ class DataCollector:
         self.whole_body = robot.get('whole_body')
         self.cam = RGBD()
         self.data = dict() # list of processed depth images and actions taken (I_t, a_t)
+        self.rgbd_map = RGBD2Map() # makes frame we need but we don't use it otherwise
+
+        # TODO: eventually we need to remove this. Doing this to let us go from
+        # camera coordinates to world frame, but we need HSR_CORE to support it.
+        # But, should be easy because the grasp planner is pretty simple ...
+        self.gp = GraspPlanner()
+        self.gripper = Bed_Gripper(self.gp, self.cam, options=None, gripper=robot.get('gripper'))
+
         print("Initialized the data collector! Resting for 2 seconds...")
         time.sleep(2)
 
@@ -221,8 +234,10 @@ class DataCollector:
         exist target images you can use, and (b) that the poses in rviz look
         reasonable.
         """        
+        idx = 0
+
         # Pick images to try from the saved file, and then current image.
-        pth_end = 'tmp_physical_targs/d_img_proc_001.png'
+        pth_end = 'tmp_physical_targs/d_img_proc_000.png'
         img_end = cv2.imread(pth_end)
         c_img, d_img, d_img_proc = self.get_images()
         assert c_img.shape == d_img_proc.shape == (480,640,3), c_img.shape
@@ -268,8 +283,13 @@ class DataCollector:
         print("pred_pos for 224x224 img: {} (scaled {})".format(out_pos, pred_pos_proc))
         print("pred_pos for 480x640 img: {}".format(pred_pos))
         print("out angle (logits): {}".format(out_ang))
+        print("current idx for grasp pose: {}".format(idx))
+        # TODO: later, save in a principled manner.
 
-        # TODO: execute on the physical robot
+        # TODO: execute on the physical robot. See `main/deploy.py` for details.
+        self.gripper.find_pick_region_net(pred_pos, c_img, d_img, idx, 'BOTTOM')
+        print("We have now broadcasted the bed_0 and bed_i_0 poses !!! Now execute grasp")
+        time.sleep(1)
 
         # And then optionally repeat the process and save ... that's trivial.
         # TODO

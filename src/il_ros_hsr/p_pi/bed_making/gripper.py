@@ -19,7 +19,7 @@ import time
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-from fast_grasp_detect.data_aug.draw_cross_hair import DrawPrediction
+#from fast_grasp_detect.data_aug.draw_cross_hair import DrawPrediction
 from sensor_msgs.msg import Image, CameraInfo, JointState
 from image_geometry import PinholeCameraModel as PCM
 from il_ros_hsr.p_pi.bed_making.com import Bed_COM as COM
@@ -102,7 +102,10 @@ class Bed_Gripper(object):
             self.offset_x = 0.0
             self.offset_z = 0.0
 
+        print("In loop_broadcast, broadcasting pose!!")
+
         while True:
+            rospy.sleep(1.0)
             self.br.sendTransform((norm_pose[0], norm_pose[1], norm_pose[2]),
                     #tf.transformations.quaternion_from_euler(ai=0.0,aj=0.0,ak=0.0),
                     rot,
@@ -136,7 +139,7 @@ class Bed_Gripper(object):
             b = tf.transformations.quaternion_from_euler(ai=0.0,aj=0.0,ak=1.57)
             c = tf.transformations.quaternion_multiply(a,b)
             thread.start_new_thread(self.loop_broadcast,(norm_pose,c,g_count))
-            time.sleep(0.3)
+            time.sleep(1.0)
             count += 1
 
 
@@ -170,6 +173,15 @@ class Bed_Gripper(object):
         Args:
             pose: (x,y) point as derived from the grasp detector network
         """
+        # temp debugging
+        print('find_pick_region_net, here are the transforms')
+        transforms = self.tl.getFrameStrings() 
+        for transform in transforms:
+            print("  {}".format(transform))
+            #f_p = self.tl.lookupTransform('map',transform, rospy.Time(0))
+        print("done w/transforms\n")
+        # end tmp debugging
+        
         assert side in ['BOTTOM', 'TOP']
         self.side = side
         self.apply_offset = apply_offset
@@ -178,13 +190,15 @@ class Bed_Gripper(object):
         p_list = []
         x,y = pose
         print("in bed_making.gripper, PREDICTION {}".format(pose))
-        self.plot_on_true([x,y], c_img)
+        # NOTE for now dont do this I have other ways to visualize
+        #self.plot_on_true([x,y], c_img)
 
-        #Crop D+img
+        # Crop D+img, take 10x10 area of raw depth
         d_img_c = d_img[int(y-cfg.BOX) : int(y+cfg.BOX) , int(x-cfg.BOX) : int(cfg.BOX+x)]
 
         depth = self.gp.find_mean_depth(d_img_c)
         poses.append( [1.0, [x,y,depth]] )
+        print("pose: {}".format(poses))
         self.broadcast_poses(poses, count)
 
 
